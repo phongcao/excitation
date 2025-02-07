@@ -167,7 +167,7 @@ const combinePolygons = (polygons: number[][]) => {
   if (polygons.length == 0) return [];
 
   while (polygons.length > 1) {
-    let lastPoly = polygons.pop();
+    const lastPoly = polygons.pop();
     if (lastPoly) polygons[polygons.length - 1] = combineTwoPolygons(polygons[polygons.length - 1], lastPoly);
   }
 
@@ -282,7 +282,7 @@ const findBoundingRegions = (
       //   if (textIndex == text.length) return boundingRegions;
       // }
 
-      // Selection marks do not come back in the page.words and therefore do not have the bounds. 
+      // Selection marks do not come back in the page.words and therefore do not have the bounds.
       // selction marks are available in the paragraphs and lines but we don't currently use those fields.
       // When we encounter a selection mark from the `text` array, we skip it and continue to the next word from the `text` array.
       let currWord = text[textIndex];
@@ -475,7 +475,7 @@ const splitIntoColumns = (lines: Line[]) => {
     lines: lines
   }];
 
-  let cols = [];
+  const cols = [];
   let firstLineOfCol = 0;
 
   for (let currentLine = 0; currentLine < lines.length; currentLine++) {
@@ -499,7 +499,7 @@ const splitIntoColumns = (lines: Line[]) => {
 
   console.log(`split ${lines.length} lines into ${cols.length} columns`);
   for (let index = 0; index < cols.length; index++) {
-    let col = cols[index];
+    const col = cols[index];
     console.log(`col [${index}]: "${col.lines[0].content}" ... ${col.lines.length - 2} more lines ... "${col.lines[col.lines.length - 1].content}"`);
   }
 
@@ -516,7 +516,7 @@ const findTextFromBoundingRegions = (
   response: DocumentIntelligenceResponse,
   bounds: Bounds[]
 ) => {
-  let excerptWords = [];
+  const excerptWords = [];
   for (const bound of bounds) {
     console.log(`searching for bounds x(${bound.polygon[0]},${bound.polygon[2]}) y(${bound.polygon[1]},${bound.polygon[5]})`)
     // page numbers are 1-indexed, thus the subtraction
@@ -530,7 +530,7 @@ const findTextFromBoundingRegions = (
 
     const intersectingLines = [];
     for (const col of relevantColumns) {
-      let index = columns.indexOf(col);
+      const index = columns.indexOf(col);
       console.log(`SEARCHING col [${index}]`);
 
       intersectingLines.push(...polygonBinarySearch(col.lines, 0, col.lines.length, bound.polygon));
