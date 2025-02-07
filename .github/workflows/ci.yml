@@ -4,7 +4,7 @@
 name: CI
 
 on:
-  push:
+  pull_request:
     branches:
       - main
       - develop
@@ -25,6 +25,7 @@ jobs:
       - name: Build and Test
         run: |
           cd client
+          npm install
           npm run lint
           npm run build
 
