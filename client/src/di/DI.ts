@@ -16,7 +16,14 @@ import {
 } from "./Utility";
 import { offsetSearch } from "./OffsetSearch";
 
-// find the index of the Word that intersects with the given point in the given Region
+/**
+ * Finds the index of the word that intersects with the given point within the specified region on a page.
+ *
+ * @param point - The target point to check for intersection.
+ * @param page - The page containing the region and words.
+ * @param region - The region in which to search for the word.
+ * @returns The index of the intersecting word, or `null` if no word is found.
+ */
 function findInRegion(point: Point, page: Page, region: Region): number | null {
   let linesOfInterest = page.lines
     .slice(region.lineIndices[0], region.lineIndices[1] + 1)
@@ -53,7 +60,13 @@ function findInRegion(point: Point, page: Page, region: Region): number | null {
   return wordIndices[0];
 }
 
-// finds the index of the Word that intersects with the given point on the given Page
+/**
+ * Finds the index of the word that intersects with the given point on a page.
+ *
+ * @param point - The target point to check for intersection.
+ * @param page - The page containing regions and words.
+ * @returns The index of the intersecting word, or `null` if no word is found.
+ */
 function findInPage(point: Point, page: Page): number | null {
   if (!page.regions) return null;
 
@@ -78,8 +91,14 @@ function findInPage(point: Point, page: Page): number | null {
   return null;
 }
 
-// creates a Summary from startWord on startPage to endWord on endPage
-// page numbers must be 0-indexed
+/**
+ * Creates a summary from a specified range of words across one or more pages.
+ *
+ * @param range - A tuple representing the start and end pages (0-indexed).
+ * @param wordRange - A tuple representing the start and end word indices.
+ * @param di - The document interpretation response containing the text analysis.
+ * @returns A `Summary` object containing the extracted excerpt and polygonal representation.
+ */
 function createSummary(
   [startPage, endPage]: Range,
   [startWord, endWord]: Range,
@@ -130,10 +149,16 @@ function createSummary(
   return summary;
 }
 
-// takes in a CursorRange and creates the corresponding Summary
-// if the start and end points are the same, or
-// if the start is found and the end is not,
-// the Summary will be single-word
+/**
+ * Converts a cursor-based range selection into a `Summary` object.
+ *
+ * @param range - A `CursorRange` object specifying the start and end selection.
+ * @param di - The document interpretation response containing the text analysis.
+ * @returns A `Summary` object representing the selected range.
+ *
+ * - If the start and end points are the same, or if the start is found but the end is not,
+ *   the summary will contain only the single start word.
+ */
 export function rangeToSummary(
   range: CursorRange,
   di: DocIntResponse
@@ -163,7 +188,16 @@ export function rangeToSummary(
   return createSummary([startPage, endPage], [startWord, endWord], di);
 }
 
-// takes in an excerpt and creates the corresponding Summary with the *first* instance of the excerpt in di
+/**
+ * Finds the first occurrence of an excerpt within the document and creates a `Summary` object.
+ *
+ * @param excerpt - The target text snippet to search for.
+ * @param di - The document interpretation response containing the text analysis.
+ * @returns A `Summary` object containing the first occurrence of the excerpt.
+ *
+ * - If the excerpt is not found, an empty `Summary` is returned.
+ * - The search considers whitespace-separated words.
+ */
 export function excerptToSummary(excerpt: string, di: DocIntResponse): Summary {
   if (!excerpt || excerpt == "" || excerpt.length <= 1) return {} as Summary;
   console.log(`excerptToSummary | seeking '${excerpt}'`);

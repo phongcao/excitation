@@ -4,12 +4,22 @@ import { Point, Polygon4, PolygonC, Range } from "./Types";
 // === GETTERS ===
 // ===============
 
-// returns the minimum and maximum x-values of a polygon4
+/**
+ * Retrieves the minimum and maximum x-coordinates of a `Polygon4`.
+ *
+ * @param poly - The four-sided polygon.
+ * @returns A tuple `[minX, maxX]` representing the horizontal bounds.
+ */
 function getX(poly: Polygon4): Range {
   return [Math.min(poly[0], poly[6]), Math.max(poly[2], poly[4])];
 }
 
-// returns the minimum and maximum y-values of a polygon4
+/**
+ * Retrieves the minimum and maximum y-coordinates of a `Polygon4`.
+ *
+ * @param poly - The four-sided polygon.
+ * @returns A tuple `[minY, maxY]` representing the vertical bounds.
+ */
 function getY(poly: Polygon4): Range {
   return [Math.min(poly[1], poly[3]), Math.max(poly[5], poly[7])];
 }
@@ -18,7 +28,13 @@ function getY(poly: Polygon4): Range {
 // === ADJACENCY ===
 // =================
 
-// Returns true if polygons share y-axis space
+/**
+ * Determines if two polygons share the same y-axis space (i.e., they are on the same line).
+ *
+ * @param poly0 - The first polygon.
+ * @param poly1 - The second polygon.
+ * @returns `true` if the polygons share y-axis space, otherwise `false`.
+ */
 function onSameLine(poly0: Polygon4, poly1: Polygon4): boolean {
   const y0 = getY(poly0);
   const y1 = getY(poly1);
@@ -27,9 +43,14 @@ function onSameLine(poly0: Polygon4, poly1: Polygon4): boolean {
   return !noOverlap;
 }
 
-// Return true if polygons overlap (including sharing borders); false otherwise
-// delta controls the amount of space that can be between polygons without them
-// being considered non-adjacent (i.e. accounts for spaces between words/lines)
+/**
+ * Determines if two polygons are adjacent or overlapping.
+ *
+ * @param poly0 - The first polygon.
+ * @param poly1 - The second polygon.
+ * @param delta - The tolerance for adjacency (default: `0`).
+ * @returns `true` if the polygons are adjacent or overlapping, otherwise `false`.
+ */
 export function adjacent(poly0: Polygon4, poly1: Polygon4, delta = 0): boolean {
   const [x0, y0] = [getX(poly0), getY(poly0)];
   const [x1, y1] = [getX(poly1), getY(poly1)];
@@ -48,10 +69,17 @@ export function adjacent(poly0: Polygon4, poly1: Polygon4, delta = 0): boolean {
 // === COMPARISON ===
 // ==================
 
-// compares poly to refPol; returns
-// - if poly is narrower than refPoly
-// 0 if they are roughly equal (controlled by delta)
-// + if poly is wider than refPoly
+/**
+ * Compares the width of a polygon against a reference polygon.
+ *
+ * @param poly - The polygon to compare.
+ * @param refPoly - The reference polygon.
+ * @param delta - The allowed deviation before considering the widths different (default: `0.2`).
+ * @returns
+ * - `-1` if `poly` is narrower than `refPoly`.
+ * - `0` if their widths are roughly equal.
+ * - `1` if `poly` is wider than `refPoly`.
+ */
 function comparePolyWidth(
   poly: Polygon4,
   refPoly: Polygon4,
@@ -68,13 +96,16 @@ function comparePolyWidth(
   return 0;
 }
 
-// compares poly to refPoly
-// if both polys are in the same region, then the comparison
-// is not just true visually but true for document flow
-// returns:
-// - if poly is situated earlier in the page than refPoly
-// 0 if poly is sitatued within/about refPoly
-// + if poly is situated later in the page than refPoly
+/**
+ * Compares the position of a polygon relative to a reference polygon.
+ *
+ * @param poly - The polygon to compare.
+ * @param refPoly - The reference polygon.
+ * @returns
+ * - `-1` if `poly` is earlier in the document than `refPoly`.
+ * - `0` if `poly` is situated within or about `refPoly`.
+ * - `1` if `poly` is later in the document than `refPoly`.
+ */
 function comparePolygons(poly: Polygon4, refPoly: Polygon4): number {
   const [x, y] = [getX(poly), getY(poly)];
   const [refX, refY] = [getX(refPoly), getY(refPoly)];
@@ -88,13 +119,16 @@ function comparePolygons(poly: Polygon4, refPoly: Polygon4): number {
   return 0;
 }
 
-// compares point to refPoly
-// if both are in the same region, then the comparison
-// is not just true visually but true for document flow
-// returns:
-// - if point is situated earlier in the page than refPoly
-// 0 if point is sitatued within refPoly
-// + if point is situated later in the page than refPoly
+/**
+ * Compares a point to a reference polygon to determine document flow position.
+ *
+ * @param point - The point to compare.
+ * @param refPoly - The reference polygon.
+ * @returns
+ * - `-1` if `point` is earlier than `refPoly`.
+ * - `0` if `point` is within `refPoly`.
+ * - `1` if `point` is later than `refPoly`.
+ */
 export function comparePointToPolygon(point: Point, refPoly: Polygon4): number {
   const [refX, refY] = [getX(refPoly), getY(refPoly)];
 
@@ -107,13 +141,16 @@ export function comparePointToPolygon(point: Point, refPoly: Polygon4): number {
   return 0;
 }
 
-// compares point to refPoint
-// if both are in the same region, then the comparison
-// is not just true visually but true for document flow
-// returns:
-// - if point is situated earlier in the page than refPoint
-// 0 if point is sitatued at refPoint
-// + if point is situated later in the page than refPoint
+/**
+ * Compares two points to determine their document flow position.
+ *
+ * @param point - The point to compare.
+ * @param refPoint - The reference point.
+ * @returns
+ * - `-1` if `point` is earlier than `refPoint`.
+ * - `0` if `point` is at `refPoint`.
+ * - `1` if `point` is later than `refPoint`.
+ */
 export function comparePoints(point: Point, refPoint: Point): number {
   if (point.y < refPoint.y) return -1;
   if (point.y > refPoint.y) return 1;
@@ -128,8 +165,12 @@ export function comparePoints(point: Point, refPoint: Point): number {
 // === COMBINATION ===
 // ===================
 
-// Combine an array of polygon4 into one polygon4
-// the array must be nonempty
+/**
+ * Combines an array of `Polygon4` into a single `Polygon4`.
+ *
+ * @param polygons - The array of polygons to merge (must be non-empty).
+ * @returns A single combined `Polygon4` encompassing all input polygons.
+ */
 export function combinePolygons4(polygons: Polygon4[]): Polygon4 {
   if (polygons.length == 1) return polygons[0];
 
@@ -146,8 +187,16 @@ export function combinePolygons4(polygons: Polygon4[]): Polygon4 {
   return [x0, y0, x1, y0, x1, y1, x0, y1];
 }
 
-// Combine an array of polygon4 into one polygon
-// there's six possible shapes that can result from this
+/**
+ * Combines an array of `Polygon4` into a `PolygonC` structure, accounting for complex shapes.
+ *
+ * @param polygons - The array of polygons to merge.
+ * @returns A `PolygonC` object representing the combined shape.
+ *
+ * - Supports various multi-line and complex polygon structures.
+ * - The function determines whether the polygons form a head-body-tail structure.
+ */
+// There are six possible shapes that can result from this:
 // ========
 //  #####   single polygon4, shape (A) "h" or "b"
 // ========
@@ -185,6 +234,7 @@ export function combinePolygons(polygons: Polygon4[]): PolygonC {
       break;
     }
   }
+
   // Then the `tail`
   for (; tailIndex > headIndex; tailIndex--) {
     if (
@@ -195,36 +245,38 @@ export function combinePolygons(polygons: Polygon4[]): PolygonC {
       break;
     }
   }
+
   // Any remaining lines become the `body`
   if (tailIndex - headIndex > 1)
     body = combinePolygons4(polygons.slice(headIndex + 1, tailIndex));
 
   // now we create the poly
   if (body == zero) {
-    if (tail == zero) return { type: "h", head: head }; // (A)
+    if (tail == zero) return { head: head }; // (A)
 
     // if the head and the tail are the same width, just return a single poly
     if (comparePolyWidth(head, tail) == 0)
-      return { type: "b", body: combinePolygons4([head, tail]) }; // (A)
+      return { body: combinePolygons4([head, tail]) }; // (A)
 
-    return { type: "ht", head: head, tail: tail }; // (B) or (C)
+    return { head: head, tail: tail }; // (B) or (C)
   }
+
   // we need to do a few checks...
   // is the head actually just a body line?
   if (comparePolyWidth(head, body) >= 0) {
     body = combinePolygons4([head, body]);
     head = zero;
-    if (tail == zero) return { type: "b", body: body }; // (A)
+    if (tail == zero) return { body: body }; // (A)
   }
 
   // is the tail actually just a body line?
   if (comparePolyWidth(tail, body) >= 0) {
     body = combinePolygons4([body, tail]);
     tail = zero;
-    if (head == zero) return { type: "b", body: body }; // (A)
-    return { type: "hb", head: head, body: body }; // (D)
+    if (head == zero) return { body: body }; // (A)
+    return { head: head, body: body }; // (D)
   }
 
-  if (head == zero) return { type: "bt", body: body, tail: tail }; // (E)
-  return { type: "hbt", head: head, body: body, tail: tail }; // (F)
+  if (head == zero) return { body: body, tail: tail }; // (E)
+  return { head: head, body: body, tail: tail }; // (F)
 }

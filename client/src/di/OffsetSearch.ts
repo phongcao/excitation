@@ -1,17 +1,30 @@
 import { Range, Word } from "./Types";
 
-// compares offsetRange against refOffset. returns:
-// - if offsetRange is earlier in the page than refOffset
-// 0 if offsetRange contains refOffset
-// + if offsetRange is later in the page than refOffset
+/**
+ * Compares an offset range against a reference offset.
+ *
+ * @param offsetRange - A tuple representing the start and end offsets.
+ * @param refOffset - The reference offset to compare against.
+ * @returns
+ * - `-1` if `offsetRange` is earlier in the page than `refOffset`.
+ * - `0` if `offsetRange` contains `refOffset`.
+ * - `1` if `offsetRange` is later in the page than `refOffset`.
+ */
 function compareOffsets(offsetRange: Range, refOffset: number): number {
   if (offsetRange[1] < refOffset) return -1;
   if (offsetRange[0] > refOffset) return 1;
   return 0;
 }
 
-// starting from words[axis] and working backward, find the first entry
-// in words that overlaps with offsetRange
+/**
+ * Finds the first index in the word array that overlaps with the given offset range,
+ * starting from a specified index and moving backward.
+ *
+ * @param words - The array of words to search through.
+ * @param axis - The starting index to search from.
+ * @param offsetRange - The range of offsets to match against.
+ * @returns The index of the first word that intersects with the offset range.
+ */
 function getFirstOffsetIntersectionIndex(
   words: Word[],
   axis: number,
@@ -25,8 +38,15 @@ function getFirstOffsetIntersectionIndex(
   return ++axis;
 }
 
-// starting from words[axis] and working forward, find the last entry
-// in words that overlaps with offsetRange
+/**
+ * Finds the last index in the word array that overlaps with the given offset range,
+ * starting from a specified index and moving forward.
+ *
+ * @param words - The array of words to search through.
+ * @param axis - The starting index to search from.
+ * @param offsetRange - The range of offsets to match against.
+ * @returns The index of the last word that intersects with the offset range.
+ */
 function getLastOffsetIntersectionIndex(
   words: Word[],
   axis: number,
@@ -40,8 +60,15 @@ function getLastOffsetIntersectionIndex(
   return --axis;
 }
 
-// searches words[start, end) (that is, inclusive of start and exclusive of end)
-// for the words contained within the offset range and returns their index range
+/**
+ * Performs a binary search on a subset of words to find the index range
+ * of words contained within the specified offset range.
+ *
+ * @param words - The array of words to search.
+ * @param range - A tuple `[start, end]` specifying the search boundaries (inclusive start, exclusive end).
+ * @param offsetRange - The range of offsets to search for.
+ * @returns A tuple `[firstIndex, lastIndex]` representing the index range of matching words, or `null` if no match is found.
+ */
 function offsetBinarySearch(
   words: Word[],
   [start, end]: Range,
@@ -75,7 +102,16 @@ function offsetBinarySearch(
   return null;
 }
 
-// kicks it off while hiding the bsearch aspects from the caller
+/**
+ * Searches for words within the given offset range using a binary search.
+ *
+ * @param words - The array of words to search.
+ * @param offsetRange - The range of offsets to find within the words.
+ * @returns A tuple `[firstIndex, lastIndex]` representing the index range of matching words, or `null` if no match is found.
+ *
+ * - This function acts as a wrapper around `offsetBinarySearch`, initiating the search
+ *   across the entire word array.
+ */
 export function offsetSearch(words: Word[], offsetRange: Range): Range | null {
   return offsetBinarySearch(words, [0, words.length], offsetRange);
 }
