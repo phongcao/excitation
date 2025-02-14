@@ -29,18 +29,33 @@ function getY(poly: Polygon4): Range {
 // =================
 
 /**
- * Determines if two polygons share the same y-axis space (i.e., they are on the same line).
+ * Checks if two polygons overlap along the y-axis by at least a given percentage.
  *
  * @param poly0 - The first polygon.
  * @param poly1 - The second polygon.
- * @returns `true` if the polygons share y-axis space, otherwise `false`.
+ * @param threshold - The minimum required overlap ratio (default: 0.5, or 50% of the smaller polygon's height).
+ * @returns `true` if the polygons overlap along the y-axis by at least the given threshold, otherwise `false`.
  */
-function onSameLine(poly0: Polygon4, poly1: Polygon4): boolean {
-  const y0 = getY(poly0);
-  const y1 = getY(poly1);
+function onSameLine(
+  poly0: Polygon4,
+  poly1: Polygon4,
+  threshold: number = 0.5 // Minimum 50% overlap required
+): boolean {
+  const [minY0, maxY0] = getY(poly0);
+  const [minY1, maxY1] = getY(poly1);
 
-  const noOverlap = y0[0] > y1[1] || y1[0] > y0[1];
-  return !noOverlap;
+  // No overlap if one polygon is entirely above or below the other.
+  if (minY0 > maxY1 || minY1 > maxY0) {
+    return false;
+  }
+
+  // Compute the vertical overlap.
+  const overlap = Math.min(maxY0, maxY1) - Math.max(minY0, minY1);
+  const height0 = maxY0 - minY0;
+  const height1 = maxY1 - minY1;
+
+  // Return true if the overlap is at least `threshold` of the smaller polygon's height.
+  return overlap / Math.min(height0, height1) >= threshold;
 }
 
 /**
@@ -93,29 +108,6 @@ function comparePolyWidth(
 
   if (width < refWidth - delta) return -1;
   if (width > refWidth + delta) return 1;
-  return 0;
-}
-
-/**
- * Compares the position of a polygon relative to a reference polygon.
- *
- * @param poly - The polygon to compare.
- * @param refPoly - The reference polygon.
- * @returns
- * - `-1` if `poly` is earlier in the document than `refPoly`.
- * - `0` if `poly` is situated within or about `refPoly`.
- * - `1` if `poly` is later in the document than `refPoly`.
- */
-function comparePolygons(poly: Polygon4, refPoly: Polygon4): number {
-  const [x, y] = [getX(poly), getY(poly)];
-  const [refX, refY] = [getX(refPoly), getY(refPoly)];
-
-  if (y[1] < refY[0]) return -1;
-  if (y[0] > refY[1]) return 1;
-
-  if (x[1] < refX[0]) return -1;
-  if (x[0] > refX[1]) return 1;
-
   return 0;
 }
 
@@ -174,15 +166,15 @@ export function comparePoints(point: Point, refPoint: Point): number {
 export function combinePolygons4(polygons: Polygon4[]): Polygon4 {
   if (polygons.length == 1) return polygons[0];
 
-  let x = [] as number[];
-  let y = [] as number[];
+  const x = [] as number[];
+  const y = [] as number[];
   for (const poly of polygons) {
     x.push(...getX(poly));
     y.push(...getY(poly));
   }
 
-  let [x0, x1] = [Math.min(...x), Math.max(...x)];
-  let [y0, y1] = [Math.min(...y), Math.max(...y)];
+  const [x0, x1] = [Math.min(...x), Math.max(...x)];
+  const [y0, y1] = [Math.min(...y), Math.max(...y)];
 
   return [x0, y0, x1, y0, x1, y1, x0, y1];
 }
@@ -217,7 +209,7 @@ export function combinePolygons4(polygons: Polygon4[]): Polygon4 {
 // #####
 // ========
 export function combinePolygons(polygons: Polygon4[]): PolygonC {
-  let zero = [0, 0, 0, 0, 0, 0, 0, 0] as Polygon4;
+  const zero = [0, 0, 0, 0, 0, 0, 0, 0] as Polygon4;
   let head = zero;
   let body = zero;
   let tail = zero;

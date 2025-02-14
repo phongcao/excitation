@@ -1,5 +1,11 @@
-import { CitationRegions, CitationRegionsPerPage, Polygon4 } from "./di/Types";
-import { flattenPolygon4, toPolygon4, combinePolygons } from "./di/Utility";
+import {
+  CitationRegions,
+  CitationRegionsPerPage,
+  Polygon4,
+  flattenPolygon4,
+  toPolygon4,
+  combinePolygons,
+} from "./di";
 
 export interface DocumentIntelligenceResponse {
   status: string;
@@ -157,21 +163,6 @@ const polygonize = (x: number[], y: number[]) => {
   return [x[0], y[0], x[1], y[0], x[1], y[1], x[0], y[1]];
 };
 
-// Combine two squared up polygons and return the combination
-// if the two polygons are NOT adjacent you will get weird results!!!
-const combineTwoPolygons = (poly0: number[], poly1: number[]) => {
-  const x = [Math.min(poly0[0], poly1[0]), Math.max(poly0[2], poly1[2])];
-  const y = [Math.min(poly0[1], poly1[1]), Math.max(poly0[5], poly1[5])];
-  return polygonize(x, y);
-};
-
-// Return a polygon with sides that are parallel to the major axes
-const squareUp = (poly: number[]) => {
-  const x = [Math.min(poly[0], poly[6]), Math.max(poly[2], poly[4])];
-  const y = [Math.min(poly[1], poly[3]), Math.max(poly[5], poly[7])];
-  return polygonize(x, y);
-};
-
 // return the given boundingRegions combined into the minimum possible
 // number of boundingRegions
 export function condenseRegions(boundingRegions: Bounds[]): Bounds[] {
@@ -192,7 +183,7 @@ export function condenseRegions(boundingRegions: Bounds[]): Bounds[] {
   for (const [pageNumber, polygons] of pageMap.entries()) {
     if (polygons.length === 0) continue;
 
-    let citationRegions: CitationRegions = [];
+    const citationRegions: CitationRegions = [];
     citationRegions.push(combinePolygons(polygons));
     result.push({ page: pageNumber, citationRegions });
   }
@@ -234,16 +225,6 @@ const match = (str0: string, str1: string) => {
 
   return str0 === str1;
 };
-
-// const matchArray = (strArr0: string[], strArr1: string[]) => {
-//   if (strArr0.length != strArr1.length) return false;
-
-//   for (let index = 0; index < strArr0.length; index++) {
-//     if (!match(strArr0[index], strArr1[index])) return false;
-//   }
-
-//   return true;
-// }
 
 // Given a docint response and reference text (array of words), find
 // the relevant BoundingRegions (per-word)
@@ -529,7 +510,9 @@ const splitIntoColumns = (lines: Line[]) => {
       // we combine all polys to make sure we capture the full width of the column
       // and don't accidentally just grab, say, a header (short) and a last line of
       // a paragraph (also short)
-      const polygon = combinePolygons(colLines.map((line) => line.polygon));
+      const polygon = combinePolygons(
+        colLines.map((line) => line.polygon as Polygon4)
+      );
       cols.push({
         polygon: polygon,
         lines: colLines,
@@ -571,7 +554,7 @@ const findTextFromBoundingRegions = (
     const lines = page.lines;
     const words = page.words;
 
-    const columns = splitIntoColumns(lines);
+    const columns = splitIntoColumns(lines) as Column[];
     const relevantColumns = getRelevantColumns(columns, bound.polygon);
     if (relevantColumns.length == 0)
       console.log("no relevant columns to search");

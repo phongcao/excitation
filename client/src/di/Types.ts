@@ -109,6 +109,15 @@ export interface CitationRegionsPerPage {
 }
 
 /**
+ * Represents a defined region within a page.
+ */
+export interface Region {
+  polygon: Polygon4;
+  lineIndices: Range;
+  wordIndices: Range;
+}
+
+/**
  * Represents a summary of selected text in a document.
  * - `excerpt`: The extracted text.
  * - `polygons`: The list of associated polygons on pages.

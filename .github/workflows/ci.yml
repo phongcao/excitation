@@ -28,6 +28,7 @@ jobs:
           npm install
           npm run lint
           npm run build
+          npm test
 
   validate-backend:
     runs-on: ubuntu-latest

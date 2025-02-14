@@ -25,13 +25,13 @@ import { offsetSearch } from "./OffsetSearch";
  * @returns The index of the intersecting word, or `null` if no word is found.
  */
 function findInRegion(point: Point, page: Page, region: Region): number | null {
-  let linesOfInterest = page.lines
+  const linesOfInterest = page.lines
     .slice(region.lineIndices[0], region.lineIndices[1] + 1)
     .filter(
       (line) => comparePointToPolygon(point, line.polygon as Polygon4) == 0
     );
 
-  let wordIndices = [] as number[];
+  const wordIndices = [] as number[];
   for (const line of linesOfInterest) {
     const offsetStart = line.spans[0].offset;
     const offsetEnd = offsetStart + line.spans[0].length;
@@ -85,7 +85,7 @@ function findInPage(point: Point, page: Page): number | null {
     );
 
   for (const region of regionsOfInterest) {
-    let index = findInRegion(point, page, region);
+    const index = findInRegion(point, page, region);
     if (index != null) return index;
   }
   return null;
@@ -104,10 +104,10 @@ function createSummary(
   [startWord, endWord]: Range,
   di: DocIntResponse
 ): Summary {
-  let summary = { excerpt: "", polygons: [] as PolygonOnPage[] };
+  const summary = { excerpt: "", polygons: [] as PolygonOnPage[] };
 
   for (let pageIndex = startPage; pageIndex <= endPage; pageIndex++) {
-    let page = di.analyzeResult.pages[pageIndex];
+    const page = di.analyzeResult.pages[pageIndex];
 
     // again i want the typing to stop yelling
     if (!page.regions) continue;
@@ -121,25 +121,25 @@ function createSummary(
       if (pageIndex == endPage && region.wordIndices[0] > endWord) break;
 
       // grab the relevant start and end points in the Word array
-      let start =
+      const start =
         pageIndex == startPage
           ? Math.max(startWord, region.wordIndices[0])
           : region.wordIndices[0];
-      let end =
+      const end =
         pageIndex == endPage
           ? Math.min(endWord, region.wordIndices[1])
           : region.wordIndices[1];
-      let words = page.words.slice(start, end + 1);
+      const words = page.words.slice(start, end + 1);
 
       // get excerpt from this region
-      let contents = words.map((word) => word.content);
+      const contents = words.map((word) => word.content);
       if (summary.excerpt.length > 0 && contents.length > 0)
         summary.excerpt += " ";
       summary.excerpt += contents.join(" ");
 
       // get polygon(s) from this region
-      let polygons = words.map((word) => word.polygon);
-      let poly = combinePolygons(polygons as Polygon4[]);
+      const polygons = words.map((word) => word.polygon);
+      const poly = combinePolygons(polygons as Polygon4[]);
       summary.polygons.push({
         polygon: poly,
         page: pageIndex + 1, // 1-indexed
@@ -164,10 +164,10 @@ export function rangeToSummary(
   di: DocIntResponse
 ): Summary {
   // page numbers are 1-indexed, so adjust
-  let startPage = range.start.page - 1;
-  let endPage = range.end.page - 1;
+  const startPage = range.start.page - 1;
+  const endPage = range.end.page - 1;
 
-  let startWord = findInPage(
+  const startWord = findInPage(
     range.start.point,
     di.analyzeResult.pages[range.start.page - 1]
   ); // as always, page numbers are 1-indexed and need to be adjusted
@@ -177,7 +177,7 @@ export function rangeToSummary(
   if (comparePoints(range.start.point, range.end.point) == 0)
     return createSummary([startPage, startPage], [startWord, startWord], di);
 
-  let endWord = findInPage(
+  const endWord = findInPage(
     range.end.point,
     di.analyzeResult.pages[range.end.page - 1]
   ); // as always, page numbers are 1-indexed and need to be adjusted
@@ -202,7 +202,7 @@ export function excerptToSummary(excerpt: string, di: DocIntResponse): Summary {
   if (!excerpt || excerpt == "" || excerpt.length <= 1) return {} as Summary;
   console.log(`excerptToSummary | seeking '${excerpt}'`);
 
-  let excerpts = excerpt.split(/\s+/); // all whitespace characters
+  const excerpts = excerpt.split(/\s+/); // all whitespace characters
   let currentWord = 0;
 
   for (
