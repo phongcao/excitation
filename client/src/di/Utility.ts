@@ -280,3 +280,32 @@ export function combinePolygons(polygons: Polygon4[]): PolygonC {
   if (head == zero) return { body: body, tail: tail }; // (E)
   return { head: head, body: body, tail: tail }; // (F)
 }
+
+// ==================
+// === CONVERSION ===
+// ==================
+
+/**
+ * Converts an array of 8 numbers into a `Polygon4` type.
+ *
+ * @param {number[]} polygon - An array of exactly 8 numbers representing the coordinates of a quadrilateral.
+ * @returns {Polygon4} A `Polygon4` array containing the same 8 numbers.
+ * @throws {Error} If the input array does not have exactly 8 elements.
+ */
+export function toPolygon4(polygon: number[]): Polygon4 {
+  if (polygon.length !== 8) throw new Error("Invalid polygon length");
+  return polygon.slice(0, 8) as Polygon4;
+}
+
+/**
+ * Flattens a `Polygon4` into an array of numbers.
+ *
+ * If a polygon is provided, it spreads its values into a new array.
+ * If no polygon is given (or it's `undefined`), it returns an empty array.
+ *
+ * @param {Polygon4} [polygon] - The polygon to flatten.
+ * @returns {number[]} A flat array of numbers representing the polygon.
+ */
+export function flattenPolygon4(polygon?: Polygon4): number[] {
+  return polygon ? [...polygon] : [];
+}

@@ -92,21 +92,20 @@ export interface CursorRange {
 }
 
 // ========================
-// DI Types
+// Region Types
 // ========================
 
 /**
- * Represents a text region within a page, defined by:
- * - `polygon`: The bounding polygon.
- * - `lineIndices`: The range of lines it spans.
- * - `wordIndices`: The range of words it contains.
- *
- * This is added to `DocIntResponse.analyzeResult`.
+ * An array of citation regions.
  */
-export interface Region {
-  polygon: Polygon4;
-  lineIndices: Range;
-  wordIndices: Range;
+export type CitationRegions = Array<PolygonC>;
+
+/**
+ * Represents the citation regions found on a specific page.
+ */
+export interface CitationRegionsPerPage {
+  page: number;
+  citationRegions: CitationRegions;
 }
 
 /**
@@ -120,6 +119,10 @@ export interface Summary {
   excerpt: string;
   polygons: PolygonOnPage[];
 }
+
+// ========================
+// DI Types
+// ========================
 
 /**
  * Represents the response from DI.
