@@ -204,14 +204,10 @@ const ViewerCitations = () => {
 
   const highlightSvg = (
     <svg
+      className="highlight-svg"
       style={{
-        position: "absolute",
-        top: 0,
-        left: 0,
-        pointerEvents: "none",
         width: viewer.width,
         height: viewer.height,
-        zIndex: 999,
       }}
     >
       {allPaths.map((d, i) => (
