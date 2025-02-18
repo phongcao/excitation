@@ -177,6 +177,7 @@ export function getClientFormFromBootstrap(
 
 function findCitation(citationId: string): Citation | undefined {
   for (const form of forms) {
+    console.log('FORM LOOKS LIKE', form)
     const { citations } = form;
     for (const questionCitations of citations) {
       const citation = questionCitations.find(
@@ -252,13 +253,13 @@ export async function dispatchEvent(event: Event) {
       citation.excerpt = event.excerpt;
       break;
     }
-      
+
     case "updateAnswer": {
       if (await isError())
         throw new Error(
           `Congratulations, you asked for an error and you got one!`
         );
-      
+
       const { formId, questionId, answer } = event;
       const form = forms[formId];
       if (!form) throw new Error(`Form ${formId} not found`);

@@ -261,6 +261,7 @@ const findBoundingRegions = (
   text: string[],
   response: DocumentIntelligenceResponse
 ) => {
+    console.log("WHAT THE HECK", text)
   const pages = response.analyzeResult.pages;
   let boundingRegions: Bounds[] = [];
   let textIndex = 0;
@@ -523,7 +524,6 @@ const findTextFromBoundingRegions = (
     const page = response.analyzeResult.pages[bound.pageNumber - 1];
     const lines = page.lines;
     const words = page.words;
-
     const columns = splitIntoColumns(lines);
     const relevantColumns = getRelevantColumns(columns, bound.polygon);
     if (relevantColumns.length == 0) console.log("no relevant columns to search");
@@ -551,6 +551,56 @@ const findTextFromBoundingRegions = (
   let excerpt = excerpts.join(' ');
   if (excerpt === '') excerpt = 'could not find matching line(s)';
   return excerpt;
+}
+
+//TODO: description of function
+const findParagraphFromBoundingRegions = (
+    response: DocumentIntelligenceResponse,
+    bounds: Bounds[]
+) => {
+    const found_paragraphs = [];
+    console.log("HERE BE THE BOUNDS", bounds)
+    for (const bound of bounds) {
+        const paragraphs = response.analyzeResult.paragraphs;
+        const pages_paragraphs: {[k: string]: any}= {};
+        // console.log("PARAGRAPHS?", paragraphs)
+        paragraphs.forEach( (p, idx) => {
+            const p_page = p.boundingRegions[0].pageNumber;
+            const p_index = idx;
+            const p_content = p.content;
+            if (!(`page_${p_page}` in pages_paragraphs)) {
+                pages_paragraphs[`page_${p_page}`] = []
+            }
+
+            pages_paragraphs[`page_${p_page}`].push(({
+                content: p_content,
+                paragraph_id: p_index,
+                polygon: p.boundingRegions[0].polygon
+            }))
+        });
+
+        for (const p of pages_paragraphs[`page_${bound.pageNumber}`]) {
+            console.log('paragraph', p.content)
+            console.log('paragraph polygon', p.polygon, "incoming bound", bound.polygon)
+
+                //(8) [1.2416, 3.9818, 7.3874, 3.9818, 7.3874, 4.3303, 1.2416, 4.3303]
+
+// (8) [1.2502, 3.9672, 7.3843, 3.9672, 7.3843, 4.6421, 1.2502, 4.6421]
+            const top_left_x_in_paragraph = bound.polygon[0] >= p.polygon[0] && bound.polygon[0] <= p.polygon[2];
+            const top_left_y_in_paragraph = (bound.polygon[1] * 1.02 >= p.polygon[1])  && bound.polygon[1] <= p.polygon[7];
+            const bottom_right_x_in_paragraph = bound.polygon[4] <= p.polygon[4];
+            const bottom_right_y_in_paragraph = bound.polygon[5] <= p.polygon[5];
+            console.log("paragraph has:",top_left_x_in_paragraph, top_left_y_in_paragraph,bottom_right_x_in_paragraph, bottom_right_y_in_paragraph)
+            if (top_left_x_in_paragraph && top_left_y_in_paragraph && bottom_right_x_in_paragraph && bottom_right_y_in_paragraph) {
+                console.log("I THINK IT'S THIS PARAGRAPH!!!!!!!!!");
+                console.log("Paragraph id:", p.paragraph_id)
+                found_paragraphs.push(p);
+                break;
+            }
+        };
+    }
+
+    return found_paragraphs;
 }
 
 // Takes in user selection information and a doc int response
@@ -595,7 +645,10 @@ export function findUserSelection(
   ];
 
   const excerpt = findTextFromBoundingRegions(response, bounds);
+  const paragraph_id = findParagraphFromBoundingRegions(response, bounds);
+
   console.log("found excerpt:", excerpt);
+  console.log("found paragraphid:", paragraph_id)
 
   return { excerpt, bounds };
 }

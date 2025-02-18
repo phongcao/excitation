@@ -712,6 +712,7 @@ const stateAtom = atom<State, [Action], void>(
     } else {
       // debugger
       console.log("new state", newState);
+      console.log("is this just highlighting or anything else")
       set(_stateAtom, newState);
     }
   }
