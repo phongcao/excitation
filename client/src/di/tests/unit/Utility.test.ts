@@ -5,8 +5,8 @@ import {
   comparePoints,
   combinePolygons,
   combinePolygons4,
-} from "../Utility";
-import type { Point, Polygon4 } from "../Types";
+} from "../../Utility";
+import type { Point, Polygon4 } from "../../Types";
 
 describe("Utility.ts", () => {
   describe("comparePoints", () => {
