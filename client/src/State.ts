@@ -27,6 +27,10 @@ import {
 import { calculateRange } from "./Range";
 import { createPerPageRegions } from "./di/Preprocess";
 import { BlobClient } from "@azure/storage-blob";
+import { rangeToSummary } from "./di/DI";
+import { flattenPolygon4 } from "./di/Utility";
+import { condenseRegions } from "./Utility"; // optional, if you want to merge polygons
+import { CursorRange, Bounds } from "./di/Types";
 
 export function togglePseudoBoolean(pb: PseudoBoolean): PseudoBoolean {
   return pb ? undefined : true;
@@ -436,6 +440,12 @@ const stateAtom = atom<State, [Action], void>(
                 }
 
                 switch (action.type) {
+                  case "setDebugSelection": {
+                    // Overwrite or clear the debug rectangle
+                    ux.debugSelection = action.debugSelection;
+                    break;
+                  }
+
                   case "selectCitation": {
                     selectCitation(action.citationIndex, action.reviewCitation);
                     break;
@@ -483,39 +493,120 @@ const stateAtom = atom<State, [Action], void>(
 
                   case "addSelection": {
                     console.assert(!isAsyncing);
-                    console.assert(ux.range !== undefined);
-                    console.assert(ux.documentId !== undefined);
+                    console.assert(ux.range !== undefined); // from "setSelectedText"
+
+                    // Step A: Rebuild the DOM Range from your serialized range
                     const realRange = calculateRange(ux.range);
-                    console.assert(realRange !== undefined);
+                    if (!realRange) return;
 
-                    const { excerpt, bounds } = findUserSelection(
-                      ux.pageNumber!,
-                      realRange!,
-                      docFromId[ux.documentId!].di
-                    );
+                    // Step B: Convert the DOM selection's bounding box into PDF coordinates
+                    const rect = realRange.getBoundingClientRect();
 
+                    // Example offset logic (you already do something similar):
+                    const topDiv =
+                      document.getElementById("answer-container")
+                        ?.offsetHeight ?? 0;
+                    const midDiv =
+                      document.getElementById("navbar")?.offsetHeight ?? 0;
+                    const crumbDiv =
+                      document.getElementById("breadcrumbs")?.offsetHeight ?? 0;
+                    const sideDiv =
+                      document.getElementById("sidebar")?.offsetWidth ?? 0;
+                    const scrollTop =
+                      document.getElementById("viewer")?.scrollTop ?? 0;
+                    const scrollLeft =
+                      document.getElementById("review-panel")?.scrollLeft ?? 0;
+
+                    // We scale screen pixels to PDF coordinates (assuming 72 dpi).
+                    const scale = 1 / 218;
+
+                    const offsetY =
+                      window.scrollY + topDiv + midDiv + crumbDiv - scrollTop;
+                    const offsetX = window.scrollY + sideDiv - scrollLeft;
+
+                    // Our start point is top-left of the selection
+                    const pdfStart = {
+                      x: (rect.left - offsetX) * scale,
+                      y: (rect.top - offsetY) * scale,
+                    };
+                    // Our end point is bottom-right
+                    const pdfEnd = {
+                      x: (rect.right - offsetX) * scale,
+                      y: (rect.bottom - offsetY) * scale,
+                    };
+
+                    // Step C: Build a CursorRange that DI.ts can understand
+                    // (Using the same page for start & end; if multi-page, handle accordingly)
+                    const cursorRange: CursorRange = {
+                      start: { page: ux.pageNumber!, point: pdfStart },
+                      end: { page: ux.pageNumber!, point: pdfEnd },
+                    };
+
+                    // Step D: Invoke the DI method
+                    const di = docFromId[ux.documentId!].di; // your DocumentIntelligence
+                    const summary = rangeToSummary(cursorRange, di);
+
+                    console.log("====================");
+                    console.log(summary.excerpt);
+                    console.log("====================");
+
+                    // summary.excerpt contains the extracted text
+                    // summary.polygons is an array of { polygon: PolygonC, page: number }
+
+                    // Step E: Convert the summary polygons -> your old "Bounds" array
+                    // Each summary.polygon can have up to 3 segments (head/body/tail).
+                    let bounds: Bounds[] = [];
+                    summary.polygons.forEach(({ polygon, page }) => {
+                      const { head, body, tail } = polygon;
+                      if (head)
+                        bounds.push({
+                          pageNumber: page,
+                          polygon: flattenPolygon4(head),
+                        });
+                      if (body)
+                        bounds.push({
+                          pageNumber: page,
+                          polygon: flattenPolygon4(body),
+                        });
+                      if (tail)
+                        bounds.push({
+                          pageNumber: page,
+                          polygon: flattenPolygon4(tail),
+                        });
+                    });
+
+                    // Optionally merge overlapping polygons if you like:
+                    bounds = condenseRegions(bounds);
+
+                    // Step F: Create the new citation in your question
                     const citationId = createCitationId(
                       metadata.formId,
                       "client"
                     );
-
-                    selectCitation(
+                    const excerpt = summary.excerpt || "No text found?";
+                    console.log("====================");
+                    console.log(excerpt);
+                    console.log("====================");
+                    const newCitationIndex =
                       questions[ux.questionIndex].citations.push({
                         documentId: ux.documentId!,
-                        citationId: citationId,
+                        citationId,
                         bounds,
                         excerpt,
                         review: Review.Unreviewed,
-                      }) - 1
-                    );
+                      }) - 1;
 
+                    // Step G: Focus the newly added citation, etc.
+                    selectCitation(newCitationIndex);
+
+                    // Step H: Kick off your async event
                     setAsync({
                       event: {
                         type: "addCitation",
                         formId: metadata.formId,
                         questionId: questions[ux.questionIndex].questionId,
                         documentId: ux.documentId!,
-                        citationId: citationId,
+                        citationId,
                         excerpt,
                         bounds,
                         review: Review.Approved,
@@ -526,6 +617,7 @@ const stateAtom = atom<State, [Action], void>(
                         questionIndex: ux.questionIndex,
                       },
                     });
+
                     break;
                   }
 

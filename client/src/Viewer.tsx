@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef } from "react";
 import { Document, Page } from "react-pdf";
 import { TextContent } from "pdfjs-dist/types/src/display/api";
 import polygonClipping from "polygon-clipping";
+import { computeDebugPolygon } from "./debugUtils";
 
 import {
   CheckmarkCircleFilled,
@@ -41,34 +42,53 @@ export function Viewer() {
   const docFromId = useDocFromId();
   const viewerRef = useRef<HTMLDivElement>(null);
 
+  // We only do real bounding-box math if there's a selection in the text layer.
   const selectionChange = useCallback(() => {
     const selection = document.getSelection();
-    let range: SerializedRange | undefined;
-    if (selection?.rangeCount) {
-      const selectionRange = selection.getRangeAt(0);
-      console.assert(viewerRef.current != undefined);
-      if (
-        !selectionRange.collapsed &&
-        viewerRef.current!.contains(selectionRange.commonAncestorContainer)
-      ) {
-        range = calculateSerializedRange(selectionRange);
-      }
+    if (!selection || !selection.rangeCount) {
+      // Clear the debug rectangle if no text is selected
+      dispatch({ type: "setDebugSelection", debugSelection: undefined });
+      return;
     }
+
+    const selectionRange = selection.getRangeAt(0);
+    // Ensure it’s non‐collapsed and inside our PDF text
+    if (
+      selectionRange.collapsed ||
+      !viewerRef.current?.contains(selectionRange.commonAncestorContainer)
+    ) {
+      dispatch({ type: "setDebugSelection", debugSelection: undefined });
+      return;
+    }
+
+    // Now we do the bounding‐box math exactly like findUserSelection
+    // except we skip the “excerpt” part; we only want the rectangle.
+
+    const { pageNumber } = ux;
+    if (!pageNumber) return;
+
+    const debugPolygon = computeDebugPolygon(selectionRange, pageNumber);
+    if (!debugPolygon) {
+      // Couldn’t compute – or maybe off the page
+      dispatch({ type: "setDebugSelection", debugSelection: undefined });
+      return;
+    }
+
     dispatch({
-      type: "setSelectedText",
-      range,
+      type: "setDebugSelection",
+      debugSelection: {
+        pageNumber,
+        polygon: debugPolygon,
+      },
     });
-  }, [dispatch]);
+  }, [dispatch, ux, viewerRef]);
 
   useEffect(() => {
-    if (editing) return;
-
     document.addEventListener("selectionchange", selectionChange);
-
     return () => {
       document.removeEventListener("selectionchange", selectionChange);
     };
-  }, [selectionChange, editing]);
+  }, [selectionChange]);
 
   const onDocumentLoadSuccess = useCallback(() => {}, []);
 
@@ -116,6 +136,43 @@ export function Viewer() {
   if (documentId !== undefined)
     console.log("pdf", docFromId[documentId].pdfUrl);
 
+  const DebugOverlay = () => {
+    const { ux, viewer } = useAppStateValue() as LoadedState;
+    const { debugSelection, pageNumber } = ux;
+    if (!debugSelection) return null;
+    if (!pageNumber || debugSelection.pageNumber !== pageNumber) return null;
+
+    // For a rectangle, just parse the polygon into x1,y1 & x2,y2
+    const [x1, y1, x2, y2, x3, y3, x4, y4] = debugSelection.polygon;
+    // Scale from PDF space to screen
+    const multiple = 72;
+    const pathData = `M ${x1 * multiple},${y1 * multiple}
+                    L ${x2 * multiple},${y2 * multiple}
+                    L ${x3 * multiple},${y3 * multiple}
+                    L ${x4 * multiple},${y4 * multiple} Z`;
+
+    return (
+      <svg
+        style={{
+          position: "absolute",
+          left: 0,
+          top: 0,
+          width: viewer.width,
+          height: viewer.height,
+          pointerEvents: "none",
+        }}
+      >
+        <path
+          d={pathData}
+          stroke="red"
+          fill="none"
+          strokeWidth={2}
+          strokeDasharray="4"
+        />
+      </svg>
+    );
+  };
+
   return (
     <div ref={viewerRef} id="viewer-viewport">
       {documentId == undefined ? (
@@ -144,6 +201,7 @@ export function Viewer() {
             />
           </Document>
           <ViewerCitations />
+          <DebugOverlay /> {/* Renders on top */}
         </>
       )}
     </div>
