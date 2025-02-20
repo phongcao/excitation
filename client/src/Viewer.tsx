@@ -113,7 +113,9 @@ export function Viewer() {
     selection.addRange(realRange);
   }, [range]);
 
-  if (documentId !== undefined)
+  if (documentId !== undefined) {
+    console.log("pdf", docFromId[documentId].pdfUrl);
+  }
 
   return (
     <div ref={viewerRef} id="viewer-viewport">
