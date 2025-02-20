@@ -114,7 +114,6 @@ export function Viewer() {
   }, [range]);
 
   if (documentId !== undefined)
-    console.log("pdf", docFromId[documentId].pdfUrl);
 
   return (
     <div ref={viewerRef} id="viewer-viewport">

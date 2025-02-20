@@ -9,12 +9,21 @@ import {
   excerptToSummary,
   flattenPolygon4,
   combinePolygons,
+  PolygonOnPage,
+  DocIntResponse,
+  Line,
+  Word,
+  Column,
+  Bounds,
+  PolygonC,
 } from "./di";
 
-interface Column {
+//TODO: This may not be necessary if we build the excerpt differently?
+export interface Column {
   polygon: number[];
   lines: Line[];
 }
+
 
 export const createCitationId = (formId: number, creator: string) => {
   return formId + "-" + creator + "-" + Date.now();
@@ -485,6 +494,92 @@ const findTextFromBoundingRegions = (
   return excerpt;
 };
 
+
+//TODO: docstring
+const findTextFromPolygonC = (
+  response: DocIntResponse,
+  incomingPolygonC: PolygonOnPage,
+  incomingPolygonCParagraph: number,
+) => {
+  const excerptWords = [];
+  const regionPage = response.analyzeResult.pages[incomingPolygonC.page - 1]
+  const polygonRegion = regionPage.regions[incomingPolygonCParagraph]
+  const regionPossibleWords = regionPage.words.slice(polygonRegion.wordIndices[0], polygonRegion.wordIndices[1]+1)
+  console.log("these are the possible words?", regionPossibleWords)
+  for (const word of regionPossibleWords){
+    if (
+      adjacent(
+        flattenPolygon4(word.polygon),
+        flattenPolygon4(incomingPolygonC.polygon.head),
+        -0.01 // Low tolerance for head
+      ) || adjacent(
+        flattenPolygon4(word.polygon),
+        flattenPolygon4(incomingPolygonC.polygon.body),
+        -0.1
+      ) || adjacent(
+        flattenPolygon4(word.polygon),
+        flattenPolygon4(incomingPolygonC.polygon.tail),
+        -0.01 // Low tolerance for tail
+      )) {
+        excerptWords.push(word)
+    }
+  }
+  const excerpts = excerptWords.map((word) => word.content)
+  return excerpts.join(" ");
+}
+
+const findParagraphFromBoundingPolygonC = (
+  response: DocIntResponse,
+  incomingPolygonC: PolygonOnPage
+) => {
+  // PolygonC will have a head, a body, and a tail
+  // find the paragraph(s) for each part
+  const found_paragraphs: Set<number> = new Set();
+
+  for (const pg of response.analyzeResult.pages) {
+    if (pg.pageNumber !== incomingPolygonC.page) { continue }
+    else {
+      // If the polygon for the paragraph from DI is adjacent/overlaps, add it to the set!
+      pg.regions?.map((region, index) => {
+        if (
+          adjacent(
+            flattenPolygon4(region.polygon),
+            flattenPolygon4(incomingPolygonC.polygon.head),
+            -0.2)
+        ) {
+          found_paragraphs.add(index)
+        }
+        if (
+          adjacent(
+            flattenPolygon4(region.polygon),
+            flattenPolygon4(incomingPolygonC.polygon.body),
+            -0.2)
+        ) {
+          found_paragraphs.add(index)
+        }
+        if (
+          adjacent(
+            flattenPolygon4(region.polygon),
+            flattenPolygon4(incomingPolygonC.polygon.tail),
+            -0.2)
+        ) {
+          found_paragraphs.add(index)
+        }
+      })
+    }
+  }
+  if (found_paragraphs.size > 1) {
+    console.log("weird, it should only be one paragraph-region per PolygonC. Found paragraph ids:", found_paragraphs)
+  }
+  else if (found_paragraphs.size <= 0) {
+    console.log("weird, the selection should intersect with some paragraph-region, somehow. Found paragarphs:", found_paragraphs)
+  }
+  else {
+    return found_paragraphs.values().next().value;
+  }
+
+};
+
 // Takes in user selection information and a doc int response
 // creates bounds from selection info
 // and finds the most likely excerpt text
@@ -493,7 +588,24 @@ export function findUserSelection(
   range: Range,
   response: DocIntResponse
 ) {
-  let { top, left, bottom, right } = range.getBoundingClientRect();
+  // Grab the rectangles from the selection
+  const selectionRects = range.getClientRects();
+  const selectionPolygons = [];
+
+  for (const rect of selectionRects) {
+    if (rect.width > 0) {
+        const rectCoords = [
+            rect.x, rect.y, // top left
+            (rect.x + rect.width), rect.y, //top right
+            (rect.x + rect.width), (rect.y + rect.height), //bottom right
+            rect.x, (rect.y + rect.height) // bottom left
+        ]
+
+        selectionPolygons.push(toPolygon4(rectCoords))
+    }
+  }
+
+  // convert the pixel locations to inches for document intelligence
   const multiplier = 72;
 
   const topDiv = document.getElementById("answer-container")?.offsetHeight;
@@ -511,37 +623,50 @@ export function findUserSelection(
 
   const dx = Math.round(window.scrollY) + sideDiv! - scrollLeft;
 
-  top = round((top - dy) / multiplier, 4);
-  bottom = round((bottom - dy) / multiplier, 4);
+  // Adjust coordinates to be in inches rather than pixels
+  for (const poly of selectionPolygons) {
+    // adjust the y coordinates on the top edge
+    poly[1] = round((poly[1] - dy) / multiplier, 4);
+    poly[3] = round((poly[3] - dy) / multiplier, 4);
 
-  left = round((left - dx) / multiplier, 4);
-  right = round((right - dx) / multiplier, 4);
+  // adjust the x coordinates of the top edge
+    poly[0] = round((poly[0] - dx) / multiplier, 4);
+    poly[2] = round((poly[2] - dx) / multiplier, 4);
 
-  if (top < 1)
-    console.log(
-      `bounds:top [${top}] is curiously small for a standard document`
-    );
-  if (bottom > 10)
-    console.log(
-      `bounds:bottom [${bottom}] is curiously large for a standard document`
-    );
-  if (left < 1)
-    console.log(
-      `bounds:left [${left}] is curiously small for a standard document`
-    );
-  if (right > 7.5)
-    console.log(
-      `bounds:right [${right}] is curiously large for a standard document`
-    );
+    //adjust the y coordinates of the bottom edge
+    poly[5] = round((poly[5] - dy) / multiplier, 4);
+    poly[7] = round((poly[7] - dy) / multiplier, 4);
 
-  const bounds = [
-    {
-      pageNumber,
-      polygon: polygonize([left, right], [top, bottom]),
-    },
-  ];
+    // adjust the x coordinates of the bottom edge
+    poly[4] = round((poly[4] - dx) / multiplier, 4);
+    poly[6] = round((poly[6] - dx) / multiplier, 4);
+  }
 
-  const excerpt = findTextFromBoundingRegions(response, bounds);
+  // Convert the collection of polygons (now in inches) to a complex polygon (PolygonC)
+  const complexSelection: PolygonC = combinePolygons(selectionPolygons)
+
+  console.log('complex polygon: ', complexSelection)
+
+  //TODO: still need to hand back the PolygonC instead of the "bounds"?
+//   const bounds = [
+//     {
+//       pageNumber,
+//       polygon: polygonize([left, right], [top, bottom]),
+//     },
+//   ];
+  const bounds: Bounds = {
+    pageNumber: pageNumber,
+    polygon: []
+  }
+
+  const complexSelectionOnPage: PolygonOnPage = {
+    polygon: complexSelection,
+    page: pageNumber
+  }
+
+  const paragraphId = findParagraphFromBoundingPolygonC(response, complexSelectionOnPage);
+  console.log('the highlighted text comes from the following paragraph(s):', paragraphId)
+  const excerpt = findTextFromPolygonC(response, complexSelectionOnPage, paragraphId)
   console.log("found excerpt:", excerpt);
 
   return { excerpt, bounds };
