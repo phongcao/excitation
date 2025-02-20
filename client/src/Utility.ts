@@ -16,6 +16,7 @@ import {
   Column,
   Bounds,
   PolygonC,
+  toPolygon4,
 } from "./di";
 
 //TODO: This may not be necessary if we build the excerpt differently?
