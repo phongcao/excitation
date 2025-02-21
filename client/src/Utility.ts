@@ -657,7 +657,7 @@ export function findUserSelection(
   }
 
   // Convert the collection of polygons (now in inches) to a complex polygon (PolygonC)
-  const complexSelection: PolygonC = combinePolygons(selectionPolygons)
+  const complexSelection: PolygonC[] = combinePolygons(selectionPolygons)
 
   console.log('complex polygon: ', complexSelection)
 
@@ -669,6 +669,13 @@ export function findUserSelection(
 //     },
 //   ];
 
+  const complextSelectionsOnPage: PolygonOnPage[] = []
+  for (const c of complexSelection) {
+    complextSelectionsOnPage.push({
+      polygon: c,
+
+    })
+  }
 
   const complexSelectionOnPage: PolygonOnPage = {
     polygon: complexSelection,

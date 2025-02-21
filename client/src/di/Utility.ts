@@ -208,14 +208,22 @@ export function combinePolygons4(polygons: Polygon4[]): Polygon4 {
 // ######## three polygon4s, shape (F) "hbt"
 // #####
 // ========
-export function combinePolygons(polygons: Polygon4[]): PolygonC {
-  const foundPolygons: PolygonC[] = []
+export function combinePolygons(polygons: Polygon4[]): PolygonC[] {
+  const foundPolygonCs: PolygonC[] = []
+  let currentPolygonCIndex = 0
   const zero = [0, 0, 0, 0, 0, 0, 0, 0] as Polygon4;
   let head = zero;
   let body = zero;
   let tail = zero;
   let headIndex = 0;
   let tailIndex = polygons.length - 1;
+
+  const firstPolygonC: PolygonC = {
+    head: zero,
+    body: zero,
+    tail: zero
+  }
+
 
   // First, the `head` line
   for (; headIndex < polygons.length; headIndex++) {
@@ -227,6 +235,7 @@ export function combinePolygons(polygons: Polygon4[]): PolygonC {
       break;
     }
   }
+  firstPolygonC.head = head
 
   // Then the `tail`
   for (; tailIndex > headIndex; tailIndex--) {
@@ -239,12 +248,51 @@ export function combinePolygons(polygons: Polygon4[]): PolygonC {
     }
   }
 
+  foundPolygonCs.push(firstPolygonC)
+
   // Any remaining lines become the `body`
+
   if (tailIndex - headIndex > 1) {
+    const bodyLines= []
+    let bodyIndex = headIndex + 1
+
+    let bodySoFar = polygons[bodyIndex];
+    for (; bodyIndex < tailIndex; bodyIndex++) {
+        console.log(bodySoFar, polygons[bodyIndex+1])
+        if (onSameLine(bodySoFar, polygons[bodyIndex+1])) {
+            bodySoFar = combinePolygons4([bodySoFar, polygons[bodyIndex+1]])
+            console.log("These things are on the same line", bodySoFar, polygons[bodyIndex+1])
+        } else {
+            bodyLines.push(bodySoFar)
+            bodySoFar = polygons[bodyIndex+1]
+        }
+        console.log("here's a collection of lines in th ebody,", bodyLines)
+    }
+
+    const leftMargin = bodyLines[0]
+    for (const poly of bodyLines) {
+        if (poly[0] <= leftMargin[0] && (poly[4] * 1.02) > leftMargin[4]){
+            foundPolygonCs[currentPolygonCIndex].body = combinePolygons4([leftMargin, poly])
+        } else if (poly[0] <= leftMargin[0] && (poly[4] * 1.02) < leftMargin[4]) {
+            foundPolygonCs[currentPolygonCIndex].tail = poly
+            currentPolygonCIndex++;
+            foundPolygonCs[currentPolygonCIndex] = {
+                head: zero,
+                body: zero,
+                tail: zero
+            }
+        } else if (poly[0] > leftMargin[0] && (poly[4] * 1.02) > leftMargin[4]) {
+            foundPolygonCs[currentPolygonCIndex].head = poly
+        }
+    }
+
+    foundPolygonCs[currentPolygonCIndex].tail = tail
+    console.log("how many polygons were detected?", foundPolygonCs.length)
+    console.log("here are the polygons:", foundPolygonCs)
     body = combinePolygons4(polygons.slice(headIndex + 1, tailIndex));
   }
 
-
+  return foundPolygonCs
   // now we create the poly
   if (body == zero) {
     if (tail == zero) return { head: head }; // (A)
