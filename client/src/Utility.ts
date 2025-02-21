@@ -21,7 +21,7 @@ export const createCitationId = (formId: number, creator: string) => {
 };
 
 // Rounds a number to the given precision
-const round = (value: number, precision = 0) => {
+export const round = (value: number, precision = 0) => {
   const multiplier = Math.pow(10, precision);
   return Math.round(value * multiplier) / multiplier;
 };
@@ -47,7 +47,7 @@ const adjacent = (poly0: number[], poly1: number[], delta = 0.2) => {
 };
 
 // from x(x0, x1) and y(y0, y1) create an 8 value polygon
-const polygonize = (x: number[], y: number[]) => {
+export const polygonize = (x: number[], y: number[]) => {
   return [x[0], y[0], x[1], y[0], x[1], y[1], x[0], y[1]];
 };
 

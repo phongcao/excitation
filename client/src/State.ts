@@ -19,13 +19,8 @@ import {
   FormStatus,
   LoadedState,
 } from "./Types";
-import {
-  createCitationId,
-  findUserSelection,
-  returnTextPolygonsFromDI,
-} from "./Utility";
-import { calculateRange } from "./Range";
-import { createPerPageRegions } from "./di/Preprocess";
+import { createCitationId, returnTextPolygonsFromDI } from "./Utility";
+import { createPerPageRegions, summaryToBounds, rangeToSummary } from "./di";
 import { BlobClient } from "@azure/storage-blob";
 
 export function togglePseudoBoolean(pb: PseudoBoolean): PseudoBoolean {
@@ -483,30 +478,39 @@ const stateAtom = atom<State, [Action], void>(
 
                   case "addSelection": {
                     console.assert(!isAsyncing);
-                    console.assert(ux.range !== undefined);
+                    console.assert(ux.cursorRange !== undefined);
                     console.assert(ux.documentId !== undefined);
-                    const realRange = calculateRange(ux.range);
-                    console.assert(realRange !== undefined);
 
-                    const { excerpt, bounds } = findUserSelection(
-                      ux.pageNumber!,
-                      realRange!,
+                    // Use the captured cursorRange (built from mouse events) directly
+                    const summary = rangeToSummary(
+                      ux.cursorRange!,
                       docFromId[ux.documentId!].di
                     );
+                    if (!summary.excerpt) {
+                      console.warn(
+                        "No valid excerpt found from user selection"
+                      );
+                      return;
+                    }
 
                     const citationId = createCitationId(
                       metadata.formId,
                       "client"
                     );
 
+                    // Create the new citation using the summary polygons for bounds.
+                    const newCitation: Citation = {
+                      documentId: ux.documentId!,
+                      citationId,
+                      bounds: summaryToBounds(summary, true),
+                      excerpt: summary.excerpt,
+                      review: Review.Unreviewed,
+                    };
+
+                    // Insert the new citation.
                     selectCitation(
-                      questions[ux.questionIndex].citations.push({
-                        documentId: ux.documentId!,
-                        citationId: citationId,
-                        bounds,
-                        excerpt,
-                        review: Review.Unreviewed,
-                      }) - 1
+                      questions[ux.questionIndex].citations.push(newCitation) -
+                        1
                     );
 
                     setAsync({
@@ -515,10 +519,10 @@ const stateAtom = atom<State, [Action], void>(
                         formId: metadata.formId,
                         questionId: questions[ux.questionIndex].questionId,
                         documentId: ux.documentId!,
-                        citationId: citationId,
-                        excerpt,
-                        bounds,
-                        review: Review.Approved,
+                        citationId,
+                        excerpt: summary.excerpt,
+                        bounds: newCitation.bounds!,
+                        review: Review.Unreviewed,
                         creator: "client",
                       },
                       onError: {
@@ -701,6 +705,11 @@ const stateAtom = atom<State, [Action], void>(
                   // here we need to assign the entire state to the ux.prevstate
                   // we can't do that inside the 'create' function (which is just about
                   // making changes *within* the state, so we do it at the top of the function
+
+                  case "setCursorRange": {
+                    ux.cursorRange = action.cursorRange;
+                    break;
+                  }
 
                   default:
                     console.log("unhandled action", action);
