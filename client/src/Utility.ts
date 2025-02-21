@@ -507,23 +507,28 @@ const findTextFromPolygonC = (
   const polygonRegion = regionPage.regions[incomingPolygonCParagraph]
   const regionPossibleWords = regionPage.words.slice(polygonRegion.wordIndices[0], polygonRegion.wordIndices[1]+1)
   console.log("these are the possible words?", regionPossibleWords)
+
+  console.log("toot is there a head?", incomingPolygonC.polygon.head)
+  console.log("is there a body?", incomingPolygonC.polygon.body)
+  console.log("is there a tail?", incomingPolygonC.polygon.tail)
+
   for (const word of regionPossibleWords){
-    if (
-      adjacent(
-        flattenPolygon4(word.polygon),
-        flattenPolygon4(incomingPolygonC.polygon.head),
-        -0.01 // Low tolerance for head
-      ) || adjacent(
+    if ((incomingPolygonC.polygon.head !== undefined && adjacent(
+          flattenPolygon4(word.polygon),
+          flattenPolygon4(incomingPolygonC.polygon.head),
+          -0.05 // Low tolerance for head
+      )) || (incomingPolygonC.polygon.body !== undefined && adjacent(
         flattenPolygon4(word.polygon),
         flattenPolygon4(incomingPolygonC.polygon.body),
         -0.1
-      ) || adjacent(
+      )) || (incomingPolygonC.polygon.tail !== undefined && adjacent(
         flattenPolygon4(word.polygon),
         flattenPolygon4(incomingPolygonC.polygon.tail),
-        -0.01 // Low tolerance for tail
-      )) {
+        -0.05 // Low tolerance for tail
+      ))) {
         excerptWords.push(word)
     }
+    else { continue }
   }
   const excerpts = excerptWords.map((word) => word.content)
   return excerpts.join(" ");
@@ -537,32 +542,39 @@ const findParagraphFromBoundingPolygonC = (
   // find the paragraph(s) for each part
   const found_paragraphs: Set<number> = new Set();
 
+  console.log("is there a head?", incomingPolygonC.polygon.head)
+  console.log("is there a body?", incomingPolygonC.polygon.body)
+  console.log("is there a tail?", incomingPolygonC.polygon.tail)
+
   for (const pg of response.analyzeResult.pages) {
     if (pg.pageNumber !== incomingPolygonC.page) { continue }
     else {
       // If the polygon for the paragraph from DI is adjacent/overlaps, add it to the set!
       pg.regions?.map((region, index) => {
         if (
+          incomingPolygonC.polygon.head !== undefined &&
           adjacent(
             flattenPolygon4(region.polygon),
             flattenPolygon4(incomingPolygonC.polygon.head),
-            -0.2)
+            -0.1)
         ) {
           found_paragraphs.add(index)
         }
-        if (
+        else if (
+          incomingPolygonC.polygon.body !== undefined &&
           adjacent(
             flattenPolygon4(region.polygon),
             flattenPolygon4(incomingPolygonC.polygon.body),
-            -0.2)
+            -0.1)
         ) {
           found_paragraphs.add(index)
         }
-        if (
+        else if (
+          incomingPolygonC.polygon.tail !== undefined &&
           adjacent(
             flattenPolygon4(region.polygon),
             flattenPolygon4(incomingPolygonC.polygon.tail),
-            -0.2)
+            -0.1)
         ) {
           found_paragraphs.add(index)
         }
@@ -605,6 +617,7 @@ export function findUserSelection(
         selectionPolygons.push(toPolygon4(rectCoords))
     }
   }
+  console.log("what are the detected polygons again?", selectionPolygons)
 
   // convert the pixel locations to inches for document intelligence
   const multiplier = 72;
@@ -655,10 +668,7 @@ export function findUserSelection(
 //       polygon: polygonize([left, right], [top, bottom]),
 //     },
 //   ];
-  const bounds: Bounds = {
-    pageNumber: pageNumber,
-    polygon: []
-  }
+
 
   const complexSelectionOnPage: PolygonOnPage = {
     polygon: complexSelection,
@@ -669,6 +679,28 @@ export function findUserSelection(
   console.log('the highlighted text comes from the following paragraph(s):', paragraphId)
   const excerpt = findTextFromPolygonC(response, complexSelectionOnPage, paragraphId)
   console.log("found excerpt:", excerpt);
+
+
+  const bounds = []
+
+  if (complexSelection.head !== undefined) {
+    bounds.push({
+      pageNumber: pageNumber,
+      polygon: complexSelection.head
+    })
+  }
+  if (complexSelection.body !== undefined) {
+    bounds.push({
+      pageNumber: pageNumber,
+      polygon: complexSelection.body
+    })
+  }
+  if (complexSelection.tail !== undefined) {
+    bounds.push({
+      pageNumber: pageNumber,
+      polygon: complexSelection.tail
+    })
+  }
 
   return { excerpt, bounds };
 }

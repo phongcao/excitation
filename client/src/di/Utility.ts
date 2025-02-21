@@ -209,6 +209,7 @@ export function combinePolygons4(polygons: Polygon4[]): Polygon4 {
 // #####
 // ========
 export function combinePolygons(polygons: Polygon4[]): PolygonC {
+  const foundPolygons: PolygonC[] = []
   const zero = [0, 0, 0, 0, 0, 0, 0, 0] as Polygon4;
   let head = zero;
   let body = zero;
@@ -239,8 +240,10 @@ export function combinePolygons(polygons: Polygon4[]): PolygonC {
   }
 
   // Any remaining lines become the `body`
-  if (tailIndex - headIndex > 1)
+  if (tailIndex - headIndex > 1) {
     body = combinePolygons4(polygons.slice(headIndex + 1, tailIndex));
+  }
+
 
   // now we create the poly
   if (body == zero) {
