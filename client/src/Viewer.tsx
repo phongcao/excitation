@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { Document, Page } from "react-pdf";
 import { TextContent } from "pdfjs-dist/types/src/display/api";
 import polygonClipping from "polygon-clipping";
@@ -22,6 +22,7 @@ import {
 import { useDispatchHandler } from "./Hooks";
 import { HoverableIcon } from "./Hooks.tsx";
 import { LoadedState, Review } from "./Types";
+import { CursorRange, Point } from "./di";
 
 const colors = ["#00acdc", "#00ac00", "#f07070"];
 const multiple = 72;
@@ -40,6 +41,49 @@ export function Viewer() {
   const editing = selectedCitation?.editing;
   const docFromId = useDocFromId();
   const viewerRef = useRef<HTMLDivElement>(null);
+  const [cursorStart, setCursorStart] = useState<Point | null>(null);
+
+  useEffect(() => {
+    const viewerElem = viewerRef.current;
+    if (!viewerElem) return;
+
+    const handleMouseDown = (e: MouseEvent) => {
+      // Get the viewer's bounding rectangle
+      const rect = viewerElem.getBoundingClientRect();
+      // Convert client coordinates into PDF coordinate space
+      const startPoint: Point = {
+        x: (e.clientX - rect.left) / multiple,
+        y: (e.clientY - rect.top) / multiple,
+      };
+      setCursorStart(startPoint);
+    };
+
+    const handleMouseUp = (e: MouseEvent) => {
+      if (!cursorStart || ux.pageNumber === undefined) return;
+      const rect = viewerElem.getBoundingClientRect();
+      const endPoint: Point = {
+        x: (e.clientX - rect.left) / multiple,
+        y: (e.clientY - rect.top) / multiple,
+      };
+
+      // Build a CursorRange from the two captured points.
+      const cursorRange: CursorRange = {
+        start: { page: ux.pageNumber, point: cursorStart },
+        end: { page: ux.pageNumber, point: endPoint },
+      };
+
+      // Dispatch the action to store the new cursorRange.
+      dispatch({ type: "setCursorRange", cursorRange });
+    };
+
+    viewerElem.addEventListener("mousedown", handleMouseDown);
+    viewerElem.addEventListener("mouseup", handleMouseUp);
+
+    return () => {
+      viewerElem.removeEventListener("mousedown", handleMouseDown);
+      viewerElem.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [cursorStart, ux.pageNumber, dispatch]);
 
   const selectionChange = useCallback(() => {
     const selection = document.getSelection();
