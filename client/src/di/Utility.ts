@@ -36,7 +36,7 @@ function getY(poly: Polygon4): Range {
  * @param threshold - The minimum required overlap ratio (default: 0.5, or 50% of the smaller polygon's height).
  * @returns `true` if the polygons overlap along the y-axis by at least the given threshold, otherwise `false`.
  */
-function onSameLine(
+export function onSameLine(
   poly0: Polygon4,
   poly1: Polygon4,
   threshold: number = 0.5 // Minimum 50% overlap required
@@ -210,10 +210,10 @@ export function combinePolygons4(polygons: Polygon4[]): Polygon4 {
 // ========
 export function combinePolygons(polygons: Polygon4[]): PolygonC[] {
   const foundPolygonCs: PolygonC[] = []
+  const finalPolygonCs: PolygonC[] = [];
   let currentPolygonCIndex = 0
   const zero = [0, 0, 0, 0, 0, 0, 0, 0] as Polygon4;
   let head = zero;
-  let body = zero;
   let tail = zero;
   let headIndex = 0;
   let tailIndex = polygons.length - 1;
@@ -258,15 +258,12 @@ export function combinePolygons(polygons: Polygon4[]): PolygonC[] {
 
     let bodySoFar = polygons[bodyIndex];
     for (; bodyIndex < tailIndex; bodyIndex++) {
-        console.log(bodySoFar, polygons[bodyIndex+1])
         if (onSameLine(bodySoFar, polygons[bodyIndex+1])) {
             bodySoFar = combinePolygons4([bodySoFar, polygons[bodyIndex+1]])
-            console.log("These things are on the same line", bodySoFar, polygons[bodyIndex+1])
         } else {
             bodyLines.push(bodySoFar)
             bodySoFar = polygons[bodyIndex+1]
         }
-        console.log("here's a collection of lines in th ebody,", bodyLines)
     }
 
     const leftMargin = bodyLines[0]
@@ -289,40 +286,76 @@ export function combinePolygons(polygons: Polygon4[]): PolygonC[] {
     foundPolygonCs[currentPolygonCIndex].tail = tail
     console.log("how many polygons were detected?", foundPolygonCs.length)
     console.log("here are the polygons:", foundPolygonCs)
-    body = combinePolygons4(polygons.slice(headIndex + 1, tailIndex));
+  } else {
+    foundPolygonCs[currentPolygonCIndex].tail = tail
+  }
+  console.log(foundPolygonCs)
+
+
+  for (const polyC of foundPolygonCs) {
+    const newPolyC: PolygonC = {};
+    if (polyC.body == zero) {
+        if (polyC.tail == zero) {
+            newPolyC.head = polyC.head;
+            finalPolygonCs.push(newPolyC);// (A)
+            continue;
+        }
+
+        if (polyC.head == zero) {
+            newPolyC.head = polyC.tail
+            finalPolygonCs.push(newPolyC);// (A)
+            continue;
+        }
+
+        // if the head and the tail are the same width, just return a single poly
+        if (comparePolyWidth(polyC.head, polyC.tail, 0.1) == 0) {
+            newPolyC.body = combinePolygons4([polyC.head, polyC.tail]); // (A)
+            finalPolygonCs.push(newPolyC);// (A)
+            continue;
+        }
+
+
+        newPolyC.head = polyC.head
+        newPolyC.tail = polyC.tail
+        finalPolygonCs.push(newPolyC); // (B) or (C)
+        continue;
+
+    }
+    if (comparePolyWidth(polyC.head, polyC.body, 0.1) >= 0) {
+        newPolyC.body = combinePolygons4([polyC.head, polyC.body]); // (A)
+        if (tail !== zero){
+            newPolyC.tail = polyC.tail
+        }
+        finalPolygonCs.push(newPolyC) // (A)
+        continue;
+    }
+    if (comparePolyWidth(polyC.tail, polyC.body, 0.1) >= 0) {
+        newPolyC.body = combinePolygons4([polyC.body, polyC.tail]);// (A)
+        if (polyC.head !== zero) {
+            newPolyC.head = polyC.head
+        }
+        finalPolygonCs.push(newPolyC); // (D)
+        continue;
+    }
+    if (polyC.head == zero) {
+        console.log("do we even get here")
+        newPolyC.body = polyC.body
+        newPolyC.tail = polyC.tail;
+
+        finalPolygonCs.push(newPolyC)  // (E)
+        continue;
+    }
+
+    newPolyC.head = polyC.head
+    newPolyC.body = polyC.body
+    newPolyC.tail = polyC.tail;
+    finalPolygonCs.push(newPolyC) // (F)
   }
 
-  return foundPolygonCs
-  // now we create the poly
-  if (body == zero) {
-    if (tail == zero) return { head: head }; // (A)
 
-    // if the head and the tail are the same width, just return a single poly
-    if (comparePolyWidth(head, tail) == 0)
-      return { body: combinePolygons4([head, tail]) }; // (A)
-
-    return { head: head, tail: tail }; // (B) or (C)
-  }
-
-  // we need to do a few checks...
-  // is the head actually just a body line?
-  if (comparePolyWidth(head, body) >= 0) {
-    body = combinePolygons4([head, body]);
-    head = zero;
-    if (tail == zero) return { body: body }; // (A)
-  }
-
-  // is the tail actually just a body line?
-  if (comparePolyWidth(tail, body) >= 0) {
-    body = combinePolygons4([body, tail]);
-    tail = zero;
-    if (head == zero) return { body: body }; // (A)
-    return { head: head, body: body }; // (D)
-  }
-
-  if (head == zero) return { body: body, tail: tail }; // (E)
-  return { head: head, body: body, tail: tail }; // (F)
+  return finalPolygonCs;
 }
+
 
 // ==================
 // === CONVERSION ===

@@ -483,9 +483,12 @@ const stateAtom = atom<State, [Action], void>(
 
                   case "addSelection": {
                     console.assert(!isAsyncing);
+                    console.log("assert after this?")
                     console.assert(ux.range !== undefined);
+                    console.log("which one?")
                     console.assert(ux.documentId !== undefined);
                     const realRange = calculateRange(ux.range);
+                    console.log("assert before this ?")
                     console.assert(realRange !== undefined);
 
                     const { excerpt, bounds } = findUserSelection(

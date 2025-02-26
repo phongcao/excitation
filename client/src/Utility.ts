@@ -1,4 +1,6 @@
 import {
+    adjacent,
+  onSameLine,
   Bounds,
   CitationRegionsPerPage,
   DocIntResponse,
@@ -36,25 +38,25 @@ const round = (value: number, precision = 0) => {
   return Math.round(value * multiplier) / multiplier;
 };
 
-// Return true if polygons overlap (including sharing borders); false otherwise
-// delta controls the amount of space that can be between polygons without them
-// being considered non-adjacent (i.e. accounts for spaces between words)
-const adjacent = (poly0: number[], poly1: number[], delta = 0.2) => {
-  const x0 = [round(poly0[0], 1), round(poly0[2], 1)];
-  const y0 = [round(poly0[1], 1), round(poly0[5], 1)];
+// // Return true if polygons overlap (including sharing borders); false otherwise
+// // delta controls the amount of space that can be between polygons without them
+// // being considered non-adjacent (i.e. accounts for spaces between words)
+// const adjacent = (poly0: number[], poly1: number[], delta = 0.2) => {
+//   const x0 = [round(poly0[0], 1), round(poly0[2], 1)];
+//   const y0 = [round(poly0[1], 1), round(poly0[5], 1)];
 
-  const x1 = [round(poly1[0], 1), round(poly1[2], 1)];
-  const y1 = [round(poly1[1], 1), round(poly1[5], 1)];
+//   const x1 = [round(poly1[0], 1), round(poly1[2], 1)];
+//   const y1 = [round(poly1[1], 1), round(poly1[5], 1)];
 
-  // The rectangles don't overlap if one rectangle's minimum in some
-  // dimension is greater than the other's maximum in that dimension
-  const noOverlap =
-    x0[0] > x1[1] + delta ||
-    x1[0] > x0[1] + delta ||
-    y0[0] > y1[1] + delta ||
-    y1[0] > y0[1] + delta;
-  return !noOverlap;
-};
+//   // The rectangles don't overlap if one rectangle's minimum in some
+//   // dimension is greater than the other's maximum in that dimension
+//   const noOverlap =
+//     x0[0] > x1[1] + delta ||
+//     x1[0] > x0[1] + delta ||
+//     y0[0] > y1[1] + delta ||
+//     y1[0] > y0[1] + delta;
+//   return !noOverlap;
+// };
 
 // from x(x0, x1) and y(y0, y1) create an 8 value polygon
 const polygonize = (x: number[], y: number[]) => {
@@ -86,65 +88,76 @@ const convertCitationRegionsToBounds = (
   const bounds: Bounds[] = [];
 
   citationRegionsPerPage.forEach(({ page, citationRegions }) => {
-    citationRegions.forEach(({ head, body, tail }) => {
-      // Process head.
-      if (head) {
-        // Create a copy of the head polygon.
-        const modifiedHead = [...head];
-        // If body is missing, tail exists, and forceOverlap is true,
-        // extend the bottom edge of head to meet the tail.
-        if (forceOverlap && !body && tail) {
-          // For a Polygon4, the bottom edge y–values are at indices 5 and 7.
-          const headBottom = Math.max(modifiedHead[5], modifiedHead[7]);
-          // The tail's top edge y–values are at indices 1 and 3.
-          const tailTop = Math.min(tail[1], tail[3]);
-          // If the head's bottom is above the tail's top, extend it downward.
-          if (headBottom < tailTop) {
-            modifiedHead[5] = tailTop;
-            modifiedHead[7] = tailTop;
-          }
+    console.log("what is a citation region?", citationRegions)
+        for (const region of citationRegions) {
+            for (const polyC of region) {
+                // Process head.
+                console.log("ENTER THE FORLOOP", typeof(polyC))
+                const head = polyC.head
+                const body = polyC.body
+                const tail = polyC.tail
+                if (head) {
+                    console.log("ENTER THE HEAD")
+                    // Create a copy of the head polygon.
+                    const modifiedHead = [...head];
+                    // If body is missing, tail exists, and forceOverlap is true,
+                    // extend the bottom edge of head to meet the tail.
+                    if (forceOverlap && !body && tail) {
+                    // For a Polygon4, the bottom edge y–values are at indices 5 and 7.
+                    const headBottom = Math.max(modifiedHead[5], modifiedHead[7]);
+                    // The tail's top edge y–values are at indices 1 and 3.
+                    const tailTop = Math.min(tail[1], tail[3]);
+                    // If the head's bottom is above the tail's top, extend it downward.
+                    if (headBottom < tailTop) {
+                        modifiedHead[5] = tailTop;
+                        modifiedHead[7] = tailTop;
+                    }
+                    }
+                    console.log("do we get here?", { pageNumber: page, polygon: modifiedHead })
+                    bounds.push({ pageNumber: page, polygon: modifiedHead });
+                }
+
+                // Process body.
+                if (body) {
+                    // Create a copy of the body polygon.
+                    const modifiedBody = [...body];
+
+                    if (forceOverlap) {
+                    // Adjust the top of the body relative to head.
+                    if (head) {
+                        // For a Polygon4, the head's bottom edge is at indices 5 and 7.
+                        const headBottom = Math.max(head[5], head[7]);
+                        // The top edge of the body is at indices 1 and 3.
+                        const bodyTop = Math.min(modifiedBody[1], modifiedBody[3]);
+                        if (headBottom < bodyTop) {
+                        modifiedBody[1] = headBottom;
+                        modifiedBody[3] = headBottom;
+                        }
+                    }
+                    // Adjust the bottom of the body relative to tail.
+                    if (tail) {
+                        // The tail's top edge is at indices 1 and 3.
+                        const tailTop = Math.min(tail[1], tail[3]);
+                        // The bottom edge of the body is at indices 5 and 7.
+                        const bodyBottom = Math.max(modifiedBody[5], modifiedBody[7]);
+                        if (bodyBottom < tailTop) {
+                        modifiedBody[5] = tailTop;
+                        modifiedBody[7] = tailTop;
+                        }
+                    }
+                    }
+                    bounds.push({ pageNumber: page, polygon: modifiedBody });
+                }
+
+                // Process tail.
+                if (tail) {
+                    bounds.push({ pageNumber: page, polygon: flattenPolygon4(tail) });
+                }
+            };
         }
-        bounds.push({ pageNumber: page, polygon: modifiedHead });
-      }
-
-      // Process body.
-      if (body) {
-        // Create a copy of the body polygon.
-        const modifiedBody = [...body];
-
-        if (forceOverlap) {
-          // Adjust the top of the body relative to head.
-          if (head) {
-            // For a Polygon4, the head's bottom edge is at indices 5 and 7.
-            const headBottom = Math.max(head[5], head[7]);
-            // The top edge of the body is at indices 1 and 3.
-            const bodyTop = Math.min(modifiedBody[1], modifiedBody[3]);
-            if (headBottom < bodyTop) {
-              modifiedBody[1] = headBottom;
-              modifiedBody[3] = headBottom;
-            }
-          }
-          // Adjust the bottom of the body relative to tail.
-          if (tail) {
-            // The tail's top edge is at indices 1 and 3.
-            const tailTop = Math.min(tail[1], tail[3]);
-            // The bottom edge of the body is at indices 5 and 7.
-            const bodyBottom = Math.max(modifiedBody[5], modifiedBody[7]);
-            if (bodyBottom < tailTop) {
-              modifiedBody[5] = tailTop;
-              modifiedBody[7] = tailTop;
-            }
-          }
-        }
-        bounds.push({ pageNumber: page, polygon: modifiedBody });
-      }
-
-      // Process tail.
-      if (tail) {
-        bounds.push({ pageNumber: page, polygon: flattenPolygon4(tail) });
-      }
-    });
   });
+
+  console.log("BOUNDS ON THE INSIDE", bounds)
 
   return bounds;
 };
@@ -183,6 +196,7 @@ export const returnTextPolygonsFromDI = (
   // summary.polygons already splits the text by region (paragraph), so each
   // `PolygonOnPage` is effectively a separate paragraph if the excerpt spans multiple paragraphs.
   const map = new Map<number, PolygonC[]>();
+  console.log(summary.polygons)
 
   for (const { polygon, page } of summary.polygons) {
     if (!map.has(page)) {
@@ -196,10 +210,11 @@ export const returnTextPolygonsFromDI = (
   for (const [page, citationRegions] of map.entries()) {
     results.push({ page, citationRegions });
   }
+  console.log("how about citationregionsperpage", results)
 
   // Sort by page ascending
   results.sort((a, b) => a.page - b.page);
-  return convertCitationRegionsToBounds(results, true);
+  return convertCitationRegionsToBounds(results, false);
 };
 
 // compares a bounding regions polygon to a reference polygon
@@ -508,24 +523,18 @@ const findTextFromPolygonC = (
   const regionPossibleWords = regionPage.words.slice(polygonRegion.wordIndices[0], polygonRegion.wordIndices[1]+1)
   console.log("these are the possible words?", regionPossibleWords)
 
-  console.log("toot is there a head?", incomingPolygonC.polygon.head)
-  console.log("is there a body?", incomingPolygonC.polygon.body)
-  console.log("is there a tail?", incomingPolygonC.polygon.tail)
 
   for (const word of regionPossibleWords){
-    if ((incomingPolygonC.polygon.head !== undefined && adjacent(
-          flattenPolygon4(word.polygon),
-          flattenPolygon4(incomingPolygonC.polygon.head),
-          -0.05 // Low tolerance for head
-      )) || (incomingPolygonC.polygon.body !== undefined && adjacent(
-        flattenPolygon4(word.polygon),
-        flattenPolygon4(incomingPolygonC.polygon.body),
-        -0.1
-      )) || (incomingPolygonC.polygon.tail !== undefined && adjacent(
-        flattenPolygon4(word.polygon),
-        flattenPolygon4(incomingPolygonC.polygon.tail),
-        -0.05 // Low tolerance for tail
-      ))) {
+    if ((incomingPolygonC.polygon.head !== undefined &&
+        adjacent(word.polygon, incomingPolygonC.polygon.head, -0.05) &&
+        onSameLine(word.polygon, incomingPolygonC.polygon.head, 0.9)
+      ) || (incomingPolygonC.polygon.body !== undefined &&
+        adjacent(word.polygon, incomingPolygonC.polygon.body, -0.1) &&
+        onSameLine(word.polygon, incomingPolygonC.polygon.body, 0.9)
+      ) || (incomingPolygonC.polygon.tail !== undefined &&
+        adjacent(word.polygon, incomingPolygonC.polygon.tail, -0.05) &&
+        onSameLine(word.polygon, incomingPolygonC.polygon.tail, 0.9)
+      )) {
         excerptWords.push(word)
     }
     else { continue }
@@ -536,50 +545,46 @@ const findTextFromPolygonC = (
 
 const findParagraphFromBoundingPolygonC = (
   response: DocIntResponse,
-  incomingPolygonC: PolygonOnPage
+  polyC: PolygonOnPage
 ) => {
   // PolygonC will have a head, a body, and a tail
   // find the paragraph(s) for each part
   const found_paragraphs: Set<number> = new Set();
 
-  console.log("is there a head?", incomingPolygonC.polygon.head)
-  console.log("is there a body?", incomingPolygonC.polygon.body)
-  console.log("is there a tail?", incomingPolygonC.polygon.tail)
-
+    console.log("so what is the polygononpage", polyC)
   for (const pg of response.analyzeResult.pages) {
-    if (pg.pageNumber !== incomingPolygonC.page) { continue }
+
+    if (pg.pageNumber !== polyC.page) { continue }
     else {
       // If the polygon for the paragraph from DI is adjacent/overlaps, add it to the set!
       pg.regions?.map((region, index) => {
         if (
-          incomingPolygonC.polygon.head !== undefined &&
-          adjacent(
-            flattenPolygon4(region.polygon),
-            flattenPolygon4(incomingPolygonC.polygon.head),
-            -0.1)
+          polyC.polygon.head !== undefined &&
+            onSameLine(polyC.polygon.head, region.polygon, 0.9) &&
+            adjacent(polyC.polygon.head, region.polygon, .1)
         ) {
+
           found_paragraphs.add(index)
         }
         else if (
-          incomingPolygonC.polygon.body !== undefined &&
-          adjacent(
-            flattenPolygon4(region.polygon),
-            flattenPolygon4(incomingPolygonC.polygon.body),
-            -0.1)
+            polyC.polygon.body !== undefined &&
+          onSameLine(region.polygon, polyC.polygon.body, 0.9 ) &&
+          adjacent(polyC.polygon.body, region.polygon, .1)
         ) {
+
           found_paragraphs.add(index)
         }
         else if (
-          incomingPolygonC.polygon.tail !== undefined &&
-          adjacent(
-            flattenPolygon4(region.polygon),
-            flattenPolygon4(incomingPolygonC.polygon.tail),
-            -0.1)
+            polyC.polygon.tail !== undefined &&
+          onSameLine(region.polygon,polyC.polygon.tail, 0.9) &&
+          adjacent(polyC.polygon.tail, region.polygon, .1)
         ) {
           found_paragraphs.add(index)
         }
       })
+
     }
+
   }
   if (found_paragraphs.size > 1) {
     console.log("weird, it should only be one paragraph-region per PolygonC. Found paragraph ids:", found_paragraphs)
@@ -656,58 +661,55 @@ export function findUserSelection(
     poly[6] = round((poly[6] - dx) / multiplier, 4);
   }
 
+  console.log("before we make them complex, here are the polygons in inches ", selectionPolygons)
   // Convert the collection of polygons (now in inches) to a complex polygon (PolygonC)
   const complexSelection: PolygonC[] = combinePolygons(selectionPolygons)
 
-  console.log('complex polygon: ', complexSelection)
+  console.log('complex polygon (with math done to it): ', complexSelection)
 
-  //TODO: still need to hand back the PolygonC instead of the "bounds"?
-//   const bounds = [
-//     {
-//       pageNumber,
-//       polygon: polygonize([left, right], [top, bottom]),
-//     },
-//   ];
+//   let bounds: Bounds[] = []
+    let excerpt = ""
+  for (const c of complexSelection){
+    const complexSelectionOnPage: PolygonOnPage= {
+        page: pageNumber,
+        polygon: c,
+    }
+    const paragraphId = findParagraphFromBoundingPolygonC(response, complexSelectionOnPage);
+    console.log('the highlighted text comes from the following paragraph(s):', paragraphId)
+    excerpt += findTextFromPolygonC(response, complexSelectionOnPage, paragraphId)
 
-  const complextSelectionsOnPage: PolygonOnPage[] = []
-  for (const c of complexSelection) {
-    complextSelectionsOnPage.push({
-      polygon: c,
 
-    })
+    // if (c.head !== undefined) {
+    //     bounds.push({
+    //       pageNumber: pageNumber,
+    //       polygon: c.head
+    //     })
+    // }
+    // if (c.body !== undefined) {
+    //     bounds.push({
+    //       pageNumber: pageNumber,
+    //       polygon: c.body
+    //     })
+    //   }
+    // if (c.tail !== undefined) {
+    //     bounds.push({
+    //       pageNumber: pageNumber,
+    //       polygon: c.tail
+    //     })
+    // }
   }
-
-  const complexSelectionOnPage: PolygonOnPage = {
-    polygon: complexSelection,
-    page: pageNumber
-  }
-
-  const paragraphId = findParagraphFromBoundingPolygonC(response, complexSelectionOnPage);
-  console.log('the highlighted text comes from the following paragraph(s):', paragraphId)
-  const excerpt = findTextFromPolygonC(response, complexSelectionOnPage, paragraphId)
-  console.log("found excerpt:", excerpt);
+  const bounds: Bounds[] = returnTextPolygonsFromDI(excerpt, response)
 
 
-  const bounds = []
 
-  if (complexSelection.head !== undefined) {
-    bounds.push({
-      pageNumber: pageNumber,
-      polygon: complexSelection.head
-    })
-  }
-  if (complexSelection.body !== undefined) {
-    bounds.push({
-      pageNumber: pageNumber,
-      polygon: complexSelection.body
-    })
-  }
-  if (complexSelection.tail !== undefined) {
-    bounds.push({
-      pageNumber: pageNumber,
-      polygon: complexSelection.tail
-    })
-  }
+//   const excerpt = findTextFromPolygonC(response, complexSelectionsOnPage, paragraphId)
+//   console.log("found excerpt:", excerpt);
+  console.log("the bounds are", bounds)
+
+
+
+
+
 
   return { excerpt, bounds };
 }
