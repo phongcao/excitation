@@ -458,6 +458,26 @@ h1 {
   position: relative;
 }
 
+/* Make PDF.js text layer non-selectable */
+.react-pdf__Page__textContent {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  -khtml-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  pointer-events: none;
+}
+
+/* Custom selection overlay */
+.selection-overlay {
+  position: absolute;
+  background-color: rgba(0, 172, 220, 0.3);
+  border: 1px solid var(--color-highlight);
+  pointer-events: none;
+  z-index: 998;
+}
+
 .viewer-citations {
   top: 0;
   left: 0;

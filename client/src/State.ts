@@ -240,7 +240,6 @@ function initialUXState(
     questionIndex,
     documentId: citation.documentId,
     pageNumber: citationHighlights[0]?.pageNumber ?? 1,
-    range: undefined,
     selectedCitation: {
       citationIndex,
       citationHighlights,
@@ -262,10 +261,7 @@ const stateAtom = atom<State, [Action], void>(
     const docFromId = get(docFromIdAtom);
 
     // let's get some special cases out of the way
-
-    if (action.type != "setSelectedText") {
-      console.log("dispatching", action, prevState);
-    }
+    console.log("dispatching", action, prevState);
 
     let newState: State;
 
@@ -329,7 +325,6 @@ const stateAtom = atom<State, [Action], void>(
 
                 function goto(pageNumber?: number, documentId?: number) {
                   console.assert(ux.documentId !== undefined);
-                  ux.range = undefined;
                   ux.pageNumber =
                     pageNumber ?? firstCitedPage(documentId!) ?? 1;
 
@@ -458,10 +453,6 @@ const stateAtom = atom<State, [Action], void>(
 
                   case "goto":
                     goto(action.pageNumber, action.documentId);
-                    break;
-
-                  case "setSelectedText":
-                    ux.range = action.range;
                     break;
 
                   case "setViewerSize": {

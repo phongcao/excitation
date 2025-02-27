@@ -1,5 +1,4 @@
 import { Bounds, CursorRange, DocIntResponse } from "./di";
-import { SerializedRange } from "./Range";
 
 export type PseudoBoolean = undefined | true;
 
@@ -51,10 +50,6 @@ export type Action =
     type: "goto";
     documentId?: number;
     pageNumber?: number;
-  }
-  | {
-    type: "setSelectedText";
-    range?: SerializedRange;
   }
   | {
     type: "setViewerSize";
@@ -200,7 +195,6 @@ export interface UXState {
 
   documentId?: number;
   pageNumber?: number;
-  range?: SerializedRange;
   cursorRange?: CursorRange;
   selectedCitation?: {
     citationIndex: number;

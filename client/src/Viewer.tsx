@@ -2,7 +2,8 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { Document, Page } from "react-pdf";
 import { TextContent } from "pdfjs-dist/types/src/display/api";
 import polygonClipping from "polygon-clipping";
-import { CursorRange, Point } from "./di";
+import { CursorRange, Point, Summary } from "./di";
+import { rangeToSummary } from "./di/DI";
 
 import {
   CheckmarkCircleFilled,
@@ -14,12 +15,6 @@ import {
 } from "@fluentui/react-icons";
 
 import { useDocFromId, useAppState, useAppStateValue } from "./State";
-import {
-  calculateRange,
-  calculateSerializedRange,
-  compareRanges,
-  SerializedRange,
-} from "./Range";
 import { useDispatchHandler } from "./Hooks";
 import { HoverableIcon } from "./Hooks.tsx";
 import { LoadedState, Review } from "./Types";
@@ -34,6 +29,74 @@ interface PageCallback {
   width: number;
 }
 
+// Component for rendering the text-based selection highlights
+const SelectionHighlight = ({
+  summary,
+  viewerWidth,
+  viewerHeight,
+}: {
+  summary: Summary;
+  viewerWidth: number;
+  viewerHeight: number;
+}) => {
+  if (!summary.polygons || summary.polygons.length === 0) return null;
+
+  // Convert polygons to paths for SVG rendering
+  const allPaths: string[] = [];
+
+  summary.polygons.forEach(({ polygon }) => {
+    // Process head, body, and tail parts of the polygon
+    const parts = [polygon.head, polygon.body, polygon.tail].filter(Boolean);
+
+    parts.forEach((part) => {
+      if (!part) return;
+
+      // Convert polygon coordinates to SVG path
+      const x1 = part[0];
+      const y1 = part[1];
+      const x2 = part[4];
+      const y2 = part[5];
+
+      // Create a rectangle path
+      const path = `M ${x1 * multiple},${y1 * multiple} L ${x2 * multiple},${
+        y1 * multiple
+      } L ${x2 * multiple},${y2 * multiple} L ${x1 * multiple},${
+        y2 * multiple
+      } Z`;
+      allPaths.push(path);
+    });
+  });
+
+  return (
+    <div
+      className="viewer-citations"
+      style={{
+        width: viewerWidth,
+        height: viewerHeight,
+        zIndex: 999,
+      }}
+    >
+      <svg
+        className="highlight-svg"
+        style={{
+          width: viewerWidth,
+          height: viewerHeight,
+        }}
+      >
+        {allPaths.map((d, i) => (
+          <path
+            key={i}
+            d={d}
+            fill="rgba(0, 172, 220, 0.3)"
+            stroke="var(--color-highlight)"
+            strokeWidth={1}
+          />
+        ))}
+      </svg>
+    </div>
+  );
+};
+
 export function Viewer() {
   const [state, dispatch] = useAppState();
   const { ux } = state as LoadedState;
@@ -42,6 +105,13 @@ export function Viewer() {
   const docFromId = useDocFromId();
   const viewerRef = useRef<HTMLDivElement>(null);
   const [cursorStart, setCursorStart] = useState<Point | null>(null);
+
+  // State for selection overlay
+  const [isSelecting, setIsSelecting] = useState(false);
+  const [selectionSummary, setSelectionSummary] = useState<Summary | null>(
+    null
+  );
+  const [showAddCitation, setShowAddCitation] = useState(false);
 
   useEffect(() => {
     const viewerElem = viewerRef.current;
@@ -56,72 +126,148 @@ export function Viewer() {
       // If the event target is part of a citation control, do nothing.
       if (isCitationControl(e)) return;
 
-      // Otherwise, handle the event as before.
+      // Get the viewer's bounding rectangle
       const rect = viewerElem.getBoundingClientRect();
+
+      // Calculate the start point in PDF coordinates
       const startPoint: Point = {
         x: (e.clientX - rect.left) / multiple,
         y: (e.clientY - rect.top) / multiple,
       };
+
+      // Start the selection process
+      setIsSelecting(true);
       setCursorStart(startPoint);
+      setSelectionSummary(null);
+    };
+
+    const handleMouseMove = (e: MouseEvent) => {
+      // Only update if we're in the middle of a selection
+      if (
+        !isSelecting ||
+        !cursorStart ||
+        ux.pageNumber === undefined ||
+        ux.documentId === undefined
+      )
+        return;
+
+      // Get the viewer's bounding rectangle
+      const rect = viewerElem.getBoundingClientRect();
+
+      // Calculate the current mouse position in PDF coordinates
+      const currentPoint: Point = {
+        x: (e.clientX - rect.left) / multiple,
+        y: (e.clientY - rect.top) / multiple,
+      };
+
+      // Create a temporary cursor range for the current selection
+      const tempCursorRange: CursorRange = {
+        start: { page: ux.pageNumber, point: cursorStart },
+        end: { page: ux.pageNumber, point: currentPoint },
+      };
+
+      // Get the text summary for the current selection
+      const summary = rangeToSummary(
+        tempCursorRange,
+        docFromId[ux.documentId].di
+      );
+
+      // Update the selection summary
+      setSelectionSummary(summary);
     };
 
     const handleMouseUp = (e: MouseEvent) => {
       // If the event target is part of a citation control, ignore it.
       if (isCitationControl(e)) return;
       if (!cursorStart || ux.pageNumber === undefined) return;
+
+      // End the selection process
+      setIsSelecting(false);
+
+      // Get the viewer's bounding rectangle
       const rect = viewerElem.getBoundingClientRect();
+
+      // Calculate the end point in PDF coordinates
       const endPoint: Point = {
         x: (e.clientX - rect.left) / multiple,
         y: (e.clientY - rect.top) / multiple,
       };
 
-      // Build a CursorRange from the captured points.
-      const cursorRange: CursorRange = {
-        start: { page: ux.pageNumber, point: cursorStart },
-        end: { page: ux.pageNumber, point: endPoint },
-      };
+      // Only create a selection if it has a meaningful size
+      if (
+        Math.abs(endPoint.x - cursorStart.x) > 0.01 ||
+        Math.abs(endPoint.y - cursorStart.y) > 0.01
+      ) {
+        // Build a CursorRange from the captured points.
+        const cursorRange: CursorRange = {
+          start: { page: ux.pageNumber, point: cursorStart },
+          end: { page: ux.pageNumber, point: endPoint },
+        };
 
-      // Dispatch the action to store the new cursorRange.
-      dispatch({ type: "setCursorRange", cursorRange });
+        // Dispatch the action to store the new cursorRange.
+        dispatch({ type: "setCursorRange", cursorRange });
+
+        // Show the add citation button
+        setShowAddCitation(true);
+      }
     };
 
+    // Add event listeners
     viewerElem.addEventListener("mousedown", handleMouseDown);
+    viewerElem.addEventListener("mousemove", handleMouseMove);
     viewerElem.addEventListener("mouseup", handleMouseUp);
 
-    return () => {
-      viewerElem.removeEventListener("mousedown", handleMouseDown);
-      viewerElem.removeEventListener("mouseup", handleMouseUp);
-    };
-  }, [cursorStart, ux.pageNumber, dispatch]);
-
-  const selectionChange = useCallback(() => {
-    const selection = document.getSelection();
-    let range: SerializedRange | undefined;
-    if (selection?.rangeCount) {
-      const selectionRange = selection.getRangeAt(0);
-      console.assert(viewerRef.current != undefined);
-      if (
-        !selectionRange.collapsed &&
-        viewerRef.current!.contains(selectionRange.commonAncestorContainer)
-      ) {
-        range = calculateSerializedRange(selectionRange);
+    // Also handle case where mouse leaves the viewer
+    viewerElem.addEventListener("mouseleave", () => {
+      if (isSelecting) {
+        setIsSelecting(false);
       }
-    }
-    dispatch({
-      type: "setSelectedText",
-      range,
     });
-  }, [dispatch]);
-
-  useEffect(() => {
-    if (editing) return;
-
-    document.addEventListener("selectionchange", selectionChange);
 
     return () => {
-      document.removeEventListener("selectionchange", selectionChange);
+      // Remove event listeners
+      viewerElem.removeEventListener("mousedown", handleMouseDown);
+      viewerElem.removeEventListener("mousemove", handleMouseMove);
+      viewerElem.removeEventListener("mouseup", handleMouseUp);
+      viewerElem.removeEventListener("mouseleave", () => {});
     };
-  }, [selectionChange, editing]);
+  }, [
+    cursorStart,
+    isSelecting,
+    ux.pageNumber,
+    ux.documentId,
+    docFromId,
+    dispatch,
+  ]);
+
+  // Handler for adding a citation
+  const handleAddCitation = useCallback(() => {
+    if (ux.cursorRange) {
+      dispatch({ type: "addSelection" });
+      setShowAddCitation(false);
+    }
+  }, [dispatch, ux.cursorRange]);
+
+  // Handler for canceling citation addition
+  const handleCancelCitation = useCallback(() => {
+    // Just hide the citation button without changing the cursor range
+    // This allows the user to cancel the citation action
+    setShowAddCitation(false);
+  }, []);
+
+  // Hide the add citation button when the cursor range changes or is cleared
+  useEffect(() => {
+    if (!ux.cursorRange) {
+      setShowAddCitation(false);
+    } else if (ux.documentId !== undefined) {
+      // When cursor range is set, calculate the selection summary
+      const summary = rangeToSummary(
+        ux.cursorRange,
+        docFromId[ux.documentId].di
+      );
+      setSelectionSummary(summary);
+    }
+  }, [ux.cursorRange, ux.documentId, docFromId]);
 
   const onDocumentLoadSuccess = useCallback(() => {}, []);
 
@@ -145,26 +291,6 @@ export function Viewer() {
     },
     [dispatch]
   );
-
-  const range = documentId == undefined ? undefined : ux.range;
-
-  useEffect(() => {
-    if (!range) return;
-
-    const selection = document.getSelection()!;
-    const currentRange = selection.rangeCount && selection.getRangeAt(0);
-
-    if (currentRange) {
-      if (compareRanges(currentRange, range)) return;
-      selection.empty();
-    }
-
-    const realRange = calculateRange(range);
-
-    if (!realRange) return;
-
-    selection.addRange(realRange);
-  }, [range]);
 
   if (documentId !== undefined)
     console.log("pdf", docFromId[documentId].pdfUrl);
@@ -196,6 +322,101 @@ export function Viewer() {
               onGetTextSuccess={onTextLayerRender}
             />
           </Document>
+
+          {/* Selection overlay - text-based highlighting */}
+          {((isSelecting && selectionSummary) ||
+            (showAddCitation && selectionSummary)) &&
+            selectionSummary.polygons &&
+            selectionSummary.polygons.length > 0 && (
+              <SelectionHighlight
+                summary={selectionSummary}
+                viewerWidth={(state as LoadedState).viewer.width}
+                viewerHeight={(state as LoadedState).viewer.height}
+              />
+            )}
+
+          {/* Add citation button */}
+          {showAddCitation &&
+            !isSelecting &&
+            ux.cursorRange &&
+            selectionSummary &&
+            selectionSummary.polygons &&
+            selectionSummary.polygons.length > 0 && (
+              <div
+                className="citation-buttons-container"
+                style={{
+                  position: "absolute",
+                  left: selectionSummary.polygons[0].polygon.head
+                    ? ((selectionSummary.polygons[0].polygon.head[0] +
+                        selectionSummary.polygons[0].polygon.head[4]) *
+                        multiple) /
+                        2 -
+                      120 // Increased width to accommodate both buttons
+                    : selectionSummary.polygons[0].polygon.body
+                    ? ((selectionSummary.polygons[0].polygon.body[0] +
+                        selectionSummary.polygons[0].polygon.body[4]) *
+                        multiple) /
+                        2 -
+                      120
+                    : selectionSummary.polygons[0].polygon.tail
+                    ? ((selectionSummary.polygons[0].polygon.tail[0] +
+                        selectionSummary.polygons[0].polygon.tail[4]) *
+                        multiple) /
+                        2 -
+                      120
+                    : 0,
+                  top: selectionSummary.polygons[0].polygon.head
+                    ? selectionSummary.polygons[0].polygon.head[1] * multiple -
+                      40
+                    : selectionSummary.polygons[0].polygon.body
+                    ? selectionSummary.polygons[0].polygon.body[1] * multiple -
+                      40
+                    : selectionSummary.polygons[0].polygon.tail
+                    ? selectionSummary.polygons[0].polygon.tail[1] * multiple -
+                      40
+                    : 0,
+                  display: "flex",
+                  gap: "10px",
+                  zIndex: 1000,
+                }}
+              >
+                <div
+                  className="add-citation-button citation-control"
+                  style={{
+                    backgroundColor: "var(--color-highlight)",
+                    color: "white",
+                    padding: "8px 12px",
+                    borderRadius: "4px",
+                    cursor: "pointer",
+                    boxShadow: "0 2px 4px rgba(0,0,0,0.2)",
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleAddCitation();
+                  }}
+                >
+                  Add New Citation
+                </div>
+                <div
+                  className="cancel-citation-button citation-control"
+                  style={{
+                    backgroundColor: "#6c757d", // Gray color for cancel button
+                    color: "white",
+                    padding: "8px 12px",
+                    borderRadius: "4px",
+                    cursor: "pointer",
+                    boxShadow: "0 2px 4px rgba(0,0,0,0.2)",
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleCancelCitation();
+                  }}
+                >
+                  Cancel
+                </div>
+              </div>
+            )}
+
           <ViewerCitations />
         </>
       )}
