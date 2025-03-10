@@ -493,7 +493,7 @@ const stateAtom = atom<State, [Action], void>(
                       return;
                     }
                     console.log("BEFORE SEARCH")
-                    const textSearchResults = exactMatchSearch( "Office Commercial products and cloud s", docFromId[ux.documentId!].di)
+                    const textSearchResults = exactMatchSearch( "Revenue in", docFromId[ux.documentId!].di)
                     console.log("AFTER SEARCH", textSearchResults)
 
                     const citationId = createCitationId(

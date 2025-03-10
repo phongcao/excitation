@@ -13,7 +13,6 @@ import {
 } from "./di";
 import { 
   Range,
-  PolygonOnPage,
   Region,
 } from "./di/Types";
 
@@ -553,70 +552,88 @@ export function findUserSelection(
   return { excerpt, bounds };
 }
 
+/**
+ * Searches for exact match instances of a given input string in the full text of a document.
+ *  
+ * @param input - The input string to search for in the document.
+ * @param di - The document interpretation response containing the analyzed text.
+ * @returns An array of search results, each containing the text, page number,
+ *          bounding regions, and matching ratio.
+ * Mathing ratio is 1 because of exact matches.
+ */
 
 export function exactMatchSearch(
   input: string,
   di: DocIntResponse,
 ){
+  const SearchResults = []
   const fullText = di.analyzeResult?.content;
-  if (!fullText) return "no content";
-
+  if (!fullText) {
+    console.log("exactMatchSearch: No content in document");
+    return [];
+  }
   if (input.length === 0) {
-    console.log("exactMatchSearch: empty input");
+    console.log("exactMatchSearch: Empty input");
     return [];
   }
 
+  let index = 0;
+  while (index < fullText.length) {
+  // Locate the text input in the full text
+    const offset = fullText.indexOf(input, index);
+    if (offset === -1) {
+      // If the input text is not in the document 
+      if (index === 0) {
+        console.log("exactMatchSearch: Input text not found");
+        return [];
+      }
+      console.log("exactMatch", SearchResults);
+      return SearchResults;
+    }
+    index = offset + input.length;
 
-  if (!fullText.includes(input)) {
-    console.log("Exact match not found"); 
-    return {};
-  } 
+    // Map start and end positions to word indices
+    const startOffset = offset;
+    const endOffset = offset + input.length - 1;
 
-  console.log("Exact match found");
-
-  // Locate the excerpt in the full text
-  const offset = fullText.indexOf(input);
-  if (offset === -1) {
-    console.log("offsetBasedExcerpt | excerpt not found in content");
-    return {};
+    const startLoc = findWordByOffset(startOffset, di);
+    if (!startLoc) {
+      console.log("offsetBasedExcerpt | could not map start offset to word");
+      return [];
+    }
+    const endLoc = findWordByOffset(endOffset, di);
+    if (!endLoc) {
+      console.log("offsetBasedExcerpt | could not map end offset to word");
+      return [];
+    }
+    console.log("Got all the locations")
+    const [startPage, startWord] = startLoc;
+    const [endPage, endWord] = endLoc;
+    SearchResults.push(createSearchResult([startPage, endPage],[startWord, endWord],di));
+  }
+  return SearchResults;
   }
 
-  // Map start and end positions to word indices
-  const startOffset = offset;
-  const endOffset = offset + input.length - 1;
+/**
+ * Creates search result segment from a specified range of words across one or more pages.
+ *
+ * @param range - A tuple representing the start and end pages (0-indexed).
+ * @param wordRange - A tuple representing the start and end word indices.
+ * @param di - The document interpretation response containing the text analysis.
+ * @returns An object containing the segments of text, their page number and
+ *          their corresponding bounding regions and a matching ratio.
+ */
 
-  const startLoc = findWordByOffset(startOffset, di);
-  if (!startLoc) {
-    console.log("offsetBasedExcerpt | could not map start offset to word");
-    return {};
-  }
-  const endLoc = findWordByOffset(endOffset, di);
-  console.log("endLoc", endLoc);
-  if (!endLoc) {
-    console.log("offsetBasedExcerpt | could not map end offset to word");
-    return {};
-  }
-  console.log("Got all the locations")
-  const [startPage, startWord] = startLoc;
-  const [endPage, endWord] = endLoc;
-  console.log(" ")
-  const endResults = createSearchResults([startPage, endPage],[startWord, endWord],di)
-  console.log("endResults", endResults);
-  return endResults;
-  }
-
-
-function createSearchResults(
+function createSearchResult(
   [startPage, endPage]: Range,
   [startWord, endWord]: Range,
   di: DocIntResponse
 ){
-  const searchResults = { text: "", polygons: [] as PolygonOnPage[], pageNumber: -1, boundingRedions: [] as Region[] };
+  const segments = { text: "", pageNumber: -1, boundingRedions: [] as Region[] };
 
   for (let pageIndex = startPage; pageIndex <= endPage; pageIndex++) {
     const page = di.analyzeResult.pages[pageIndex];
 
-    // again i want the typing to stop yelling
     if (!page.regions) continue;
 
     for (const region of page.regions) {
@@ -638,25 +655,24 @@ function createSearchResults(
           : region.wordIndices[1];
       const words = page.words.slice(start, end + 1);
 
-      // get excerpt from this region
+      // get text from this region
       const contents = words.map((word) => word.content);
-      if (searchResults.text.length > 0 && contents.length > 0)
-        searchResults.text += " ";
-      searchResults.text += contents.join(" ");
+      if (segments.text.length > 0 && contents.length > 0)
+        segments.text += " ";
+      segments.text += contents.join(" ");
 
       // get polygon(s) from this region
       const polygons = words.map((word) => word.polygon);
       const poly = combinePolygons(polygons as Polygon4[]);
       console.log("poly", poly);
-      searchResults.pageNumber = pageIndex + 1;
-      searchResults.boundingRedions.push({
+      segments.pageNumber = pageIndex + 1;
+      segments.boundingRedions.push({
         polygon: region.polygon,
         lineIndices: region.lineIndices,
         wordIndices: region.wordIndices,
         paragraphIndex: region.paragraphIndex,
       });
-      console.log("searchResults", searchResults);
   }
 }
-  return {searchResults, matchingRatio: 1};
+  return {segments, matchingRatio: 1};
 }
