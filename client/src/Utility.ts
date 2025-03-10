@@ -2,6 +2,7 @@ import {
   Bounds,
   CitationRegionsPerPage,
   DocIntResponse,
+  findWordByOffset,
   Line,
   Polygon4,
   PolygonC,
@@ -10,6 +11,10 @@ import {
   flattenPolygon4,
   combinePolygons,
 } from "./di";
+import { 
+  Range,
+  PolygonOnPage,
+} from "./di/Types";
 
 interface Column {
   polygon: number[];
@@ -545,4 +550,109 @@ export function findUserSelection(
   console.log("found excerpt:", excerpt);
 
   return { excerpt, bounds };
+}
+
+
+export function exactMatchSearch(
+  input: string,
+  di: DocIntResponse,
+){
+  const fullText = di.analyzeResult?.content;
+  if (!fullText) return "no content";
+
+  if (input.length === 0) {
+    console.log("exactMatchSearch: empty input");
+    return "empty input";
+  }
+
+
+  if (!fullText.includes(input)) {
+    console.log("Exact match not found"); 
+    return "Exact match not found";
+  } 
+
+  console.log("Exact match found");
+
+  // Locate the excerpt in the full text
+  const offset = fullText.indexOf(input);
+  if (offset === -1) {
+    console.log("offsetBasedExcerpt | excerpt not found in content");
+    return "no offset";
+  }
+
+  // Map start and end positions to word indices
+  const startOffset = offset;
+  const endOffset = offset + input.length - 2;
+  console.log("startOffset", startOffset);
+  console.log("endOffset", endOffset);
+
+  const startLoc = findWordByOffset(startOffset, di);
+  console.log("startLoc", startLoc);
+  if (!startLoc) {
+    console.log("offsetBasedExcerpt | could not map start offset to word");
+    return "no start loc";
+  }
+  const endLoc = findWordByOffset(endOffset, di);
+  console.log("endLoc", endLoc);
+  if (!endLoc) {
+    console.log("offsetBasedExcerpt | could not map end offset to word");
+    return "no end loc";
+  }
+  console.log("Got all the locations")
+  const [startPage, startWord] = startLoc;
+  const [endPage, endWord] = endLoc;
+  console.log(" ")
+  const endResults = createSearchResults([startPage, endPage],[startWord, endWord],di)
+  console.log("endResults", endResults);
+  return "Exact match found";
+  }
+
+
+function createSearchResults(
+  [startPage, endPage]: Range,
+  [startWord, endWord]: Range,
+  di: DocIntResponse
+){
+  const summary = { excerpt: "", polygons: [] as PolygonOnPage[] };
+  const results = [];
+
+  for (let pageIndex = startPage; pageIndex <= endPage; pageIndex++) {
+    const page = di.analyzeResult.pages[pageIndex];
+
+    // again i want the typing to stop yelling
+    if (!page.regions) continue;
+
+    for (const region of page.regions) {
+      // if the end of this region is still prior to our startWord (and we're
+      // on startWord's page), skip it
+      if (pageIndex == startPage && region.wordIndices[1] < startWord) continue;
+      // if the beginning of this region is past our endWord (and we're on
+      // endWord's page), break the loop
+      if (pageIndex == endPage && region.wordIndices[0] > endWord) break;
+
+      // grab the relevant start and end points in the Word array
+      const start =
+        pageIndex == startPage
+          ? Math.max(startWord, region.wordIndices[0])
+          : region.wordIndices[0];
+      const end =
+        pageIndex == endPage
+          ? Math.min(endWord, region.wordIndices[1])
+          : region.wordIndices[1];
+      const words = page.words.slice(start, end + 1);
+
+      // get excerpt from this region
+      const contents = words.map((word) => word.content);
+      if (summary.excerpt.length > 0 && contents.length > 0)
+        summary.excerpt += " ";
+      summary.excerpt += contents.join(" ");
+
+      // get polygon(s) from this region
+      const polygons = words.map((word) => word.polygon);
+      const poly = combinePolygons(polygons as Polygon4[]);
+      console.log("poly", poly);
+      results.push({poly, page: pageIndex + 1});
+      }
+  }
+  return "results";
 }

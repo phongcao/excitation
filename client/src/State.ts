@@ -19,7 +19,7 @@ import {
   FormStatus,
   LoadedState,
 } from "./Types";
-import { createCitationId, returnTextPolygonsFromDI } from "./Utility";
+import { createCitationId, exactMatchSearch, returnTextPolygonsFromDI } from "./Utility";
 import { createPerPageRegions, summaryToBounds, rangeToSummary } from "./di";
 import { BlobClient } from "@azure/storage-blob";
 
@@ -492,6 +492,9 @@ const stateAtom = atom<State, [Action], void>(
                       );
                       return;
                     }
+                    console.log("BEFORE SEARCH")
+                    const textSearchResults = exactMatchSearch( "Microsoft Cloud Strength", docFromId[ux.documentId!].di)
+                    console.log("AFTER SEARCH", textSearchResults)
 
                     const citationId = createCitationId(
                       metadata.formId,

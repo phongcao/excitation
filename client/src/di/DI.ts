@@ -323,7 +323,7 @@ function offsetBasedExcerpt(excerpt: string, di: DocIntResponse): Summary {
  * @param di - The document interpretation response containing analyzed text.
  * @returns A tuple `[pageIndex, wordIndex]` if found, otherwise `null`.
  */
-function findWordByOffset(
+export function findWordByOffset(
   offset: number,
   di: DocIntResponse
 ): [number, number] | null {
