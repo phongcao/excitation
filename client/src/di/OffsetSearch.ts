@@ -97,6 +97,13 @@ function offsetBinarySearch(
       ];
 
     case 1:
+      const wordSpan = words[axis].span
+      if ((offsetRange[0] >= wordSpan.offset) , ( wordSpan.offset + wordSpan.length - 1) >= offsetRange[0]) {
+        return [
+          getFirstOffsetIntersectionIndex(words, axis, offsetRange),
+          getLastOffsetIntersectionIndex(words, axis, offsetRange),
+        ];
+      }
       return offsetBinarySearch(words, [axis + 1, end], offsetRange);
   }
   return null;

@@ -14,6 +14,7 @@ import {
 import { 
   Range,
   PolygonOnPage,
+  Region,
 } from "./di/Types";
 
 interface Column {
@@ -562,13 +563,13 @@ export function exactMatchSearch(
 
   if (input.length === 0) {
     console.log("exactMatchSearch: empty input");
-    return "empty input";
+    return [];
   }
 
 
   if (!fullText.includes(input)) {
     console.log("Exact match not found"); 
-    return "Exact match not found";
+    return {};
   } 
 
   console.log("Exact match found");
@@ -577,26 +578,23 @@ export function exactMatchSearch(
   const offset = fullText.indexOf(input);
   if (offset === -1) {
     console.log("offsetBasedExcerpt | excerpt not found in content");
-    return "no offset";
+    return {};
   }
 
   // Map start and end positions to word indices
   const startOffset = offset;
-  const endOffset = offset + input.length - 2;
-  console.log("startOffset", startOffset);
-  console.log("endOffset", endOffset);
+  const endOffset = offset + input.length - 1;
 
   const startLoc = findWordByOffset(startOffset, di);
-  console.log("startLoc", startLoc);
   if (!startLoc) {
     console.log("offsetBasedExcerpt | could not map start offset to word");
-    return "no start loc";
+    return {};
   }
   const endLoc = findWordByOffset(endOffset, di);
   console.log("endLoc", endLoc);
   if (!endLoc) {
     console.log("offsetBasedExcerpt | could not map end offset to word");
-    return "no end loc";
+    return {};
   }
   console.log("Got all the locations")
   const [startPage, startWord] = startLoc;
@@ -604,7 +602,7 @@ export function exactMatchSearch(
   console.log(" ")
   const endResults = createSearchResults([startPage, endPage],[startWord, endWord],di)
   console.log("endResults", endResults);
-  return "Exact match found";
+  return endResults;
   }
 
 
@@ -613,8 +611,7 @@ function createSearchResults(
   [startWord, endWord]: Range,
   di: DocIntResponse
 ){
-  const summary = { excerpt: "", polygons: [] as PolygonOnPage[] };
-  const results = [];
+  const searchResults = { text: "", polygons: [] as PolygonOnPage[], pageNumber: -1, boundingRedions: [] as Region[] };
 
   for (let pageIndex = startPage; pageIndex <= endPage; pageIndex++) {
     const page = di.analyzeResult.pages[pageIndex];
@@ -643,16 +640,23 @@ function createSearchResults(
 
       // get excerpt from this region
       const contents = words.map((word) => word.content);
-      if (summary.excerpt.length > 0 && contents.length > 0)
-        summary.excerpt += " ";
-      summary.excerpt += contents.join(" ");
+      if (searchResults.text.length > 0 && contents.length > 0)
+        searchResults.text += " ";
+      searchResults.text += contents.join(" ");
 
       // get polygon(s) from this region
       const polygons = words.map((word) => word.polygon);
       const poly = combinePolygons(polygons as Polygon4[]);
       console.log("poly", poly);
-      results.push({poly, page: pageIndex + 1});
-      }
+      searchResults.pageNumber = pageIndex + 1;
+      searchResults.boundingRedions.push({
+        polygon: region.polygon,
+        lineIndices: region.lineIndices,
+        wordIndices: region.wordIndices,
+        paragraphIndex: region.paragraphIndex,
+      });
+      console.log("searchResults", searchResults);
   }
-  return "results";
+}
+  return {searchResults, matchingRatio: 1};
 }
