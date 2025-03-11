@@ -1,4 +1,4 @@
-import { findWordByOffset } from ".";
+import { findWordByOffset } from "./DI";
 import { DocIntResponse, Point, Polygon4, PolygonC, Range, SearchResultSegment } from "./Types";
 
 // ===============
