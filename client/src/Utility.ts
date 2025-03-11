@@ -11,6 +11,7 @@ import {
   combinePolygons,
   Range
 } from "./di";
+
 interface Column {
   polygon: number[];
   lines: Line[];

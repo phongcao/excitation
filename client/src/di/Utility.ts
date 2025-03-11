@@ -338,7 +338,7 @@ export function exactMatchSearch(
   input: string,
   di: DocIntResponse,
 ){
-  const SearchResults = []
+  const searchResults = []
   const fullText = di.analyzeResult?.content;
   if (!fullText) {
     console.log("exactMatchSearch: No content in document");
@@ -359,7 +359,7 @@ export function exactMatchSearch(
         console.log("exactMatchSearch: Input text not found");
         return [];
       }
-      return SearchResults;
+      return searchResults;
     }
     index = offset + input.length;
 
@@ -381,9 +381,9 @@ export function exactMatchSearch(
     const [startPage, startWord] = startLoc;
     const [endPage, endWord] = endLoc;
     const segments = createSearchResult([startPage, endPage],[startWord, endWord],di)
-    SearchResults.push({segments,matchingRatio: 1});
+    searchResults.push({segments,matchingRatio: 1});
   }
-  return SearchResults;
+  return searchResults;
   }
 
 /**
