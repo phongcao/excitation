@@ -97,13 +97,6 @@ function offsetBinarySearch(
       ];
 
     case 1:
-      const wordSpan = words[axis].span
-      if ((offsetRange[0] >= wordSpan.offset) , ( wordSpan.offset + wordSpan.length - 1) >= offsetRange[0]) {
-        return [
-          getFirstOffsetIntersectionIndex(words, axis, offsetRange),
-          getLastOffsetIntersectionIndex(words, axis, offsetRange),
-        ];
-      }
       return offsetBinarySearch(words, [axis + 1, end], offsetRange);
   }
   return null;
@@ -121,4 +114,24 @@ function offsetBinarySearch(
  */
 export function offsetSearch(words: Word[], offsetRange: Range): Range | null {
   return offsetBinarySearch(words, [0, words.length], offsetRange);
+}
+
+/**
+ * Searches for the word in the array that contains the given offset.
+ *
+ * @param words - The array of words to search through.
+ * @param offset - The text offset to find within the words.
+ * @returns The index of the word that contains the offset, or -1 if not found.
+ */
+export function wordOffsetSearch(words: Word[], offset: number): number {
+  for (let i = 0; i < words.length; i++) {
+
+    const start = words[i].span.offset;
+    const end = start + words[i].span.length;
+
+    if (offset >= start && offset < end) {
+      return i;
+    }
+  }
+  return -1;
 }

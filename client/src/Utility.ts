@@ -10,12 +10,9 @@ import {
   excerptToSummary,
   flattenPolygon4,
   combinePolygons,
-} from "./di";
-import { 
-  PolygonOnPage,
+  SearchResultSegment,
   Range,
-} from "./di/Types";
-
+} from "./di";
 interface Column {
   polygon: number[];
   lines: Line[];
@@ -553,15 +550,14 @@ export function findUserSelection(
 }
 
 /**
- * Searches for exact match instances of a given input string in the full text of a document.
+ * Searches for exact match instances of a given input string in the document's full content
  *  
  * @param input - The input string to search for in the document.
  * @param di - The document interpretation response containing the analyzed text.
  * @returns An array of search results, each containing the text, page number,
- *          bounding regions, and matching ratio.
- * Mathing ratio is 1 because of exact matches.
- */
+ *          bounding regions, and matching ratio. Mathing ratio is 1 because of exact matches.
 
+ */
 export function exactMatchSearch(
   input: string,
   di: DocIntResponse,
@@ -587,7 +583,6 @@ export function exactMatchSearch(
         console.log("exactMatchSearch: Input text not found");
         return [];
       }
-      console.log("exactMatch", SearchResults);
       return SearchResults;
     }
     index = offset + input.length;
@@ -595,6 +590,7 @@ export function exactMatchSearch(
     // Map start and end positions to word indices
     const startOffset = offset;
     const endOffset = offset + input.length - 1;
+
 
     const startLoc = findWordByOffset(startOffset, di);
     if (!startLoc) {
@@ -606,10 +602,10 @@ export function exactMatchSearch(
       console.log("offsetBasedExcerpt | could not map end offset to word");
       return [];
     }
-    console.log("Got all the locations")
     const [startPage, startWord] = startLoc;
     const [endPage, endWord] = endLoc;
-    SearchResults.push(createSearchResult([startPage, endPage],[startWord, endWord],di));
+    const segments = createSearchResult([startPage, endPage],[startWord, endWord],di)
+    SearchResults.push({segments,matchingRatio: 1});
   }
   return SearchResults;
   }
@@ -620,18 +616,18 @@ export function exactMatchSearch(
  * @param range - A tuple representing the start and end pages (0-indexed).
  * @param wordRange - A tuple representing the start and end word indices.
  * @param di - The document interpretation response containing the text analysis.
- * @returns An object containing the segments of text, their page number and
- *          their corresponding bounding regions and a matching ratio.
+ * @returns Array of SearchResultSegment containing the input text, page number and
+ *          corresponding bounding regions.
  */
-
 function createSearchResult(
   [startPage, endPage]: Range,
   [startWord, endWord]: Range,
   di: DocIntResponse
-){
-  const segments = { text: "", pageNumber: -1, boundingRegions: [] as PolygonOnPage[]};
+): SearchResultSegment[] {
+  const segments: SearchResultSegment[] = [];
 
   for (let pageIndex = startPage; pageIndex <= endPage; pageIndex++) {
+    const segment = { text: "", page: -1, boundingRegions: {} as PolygonC} as SearchResultSegment;
     const page = di.analyzeResult.pages[pageIndex];
 
     if (!page.regions) continue;
@@ -657,19 +653,17 @@ function createSearchResult(
 
       // get text from this region
       const contents = words.map((word) => word.content);
-      if (segments.text.length > 0 && contents.length > 0)
-        segments.text += " ";
-      segments.text += contents.join(" ");
+      if (segment.text.length > 0 && contents.length > 0)
+        segment.text += " ";
+      segment.text += contents.join(" ");
 
       // get polygon(s) from this region
       const polygons = words.map((word) => word.polygon);
       const poly = combinePolygons(polygons as Polygon4[]);
-      segments.pageNumber = pageIndex + 1;
-      segments.boundingRegions.push({
-        polygon: poly,
-        page: pageIndex + 1
-      });
+      segment.page = pageIndex + 1;
+      segment.boundingRegions = poly;
+      segments.push(segment);
+    }
   }
-}
-  return {segments, matchingRatio: 1};
-}
+  return segments;
+};
