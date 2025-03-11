@@ -2,7 +2,7 @@ import { expect, test } from "vitest";
 import { createPerPageRegions } from "../../Preprocess";
 import { excerptToSummary, rangeToSummary } from "../../DI";
 import { CursorRange, DocIntResponse, SearchResultSegment, Summary } from "../../Types";
-import { exactMatchSearch } from "../../../Utility";
+import { exactMatchSearch } from "../../Utility";
 
 import json0 from "../../../../../local-backend/files/PressReleaseFY24Q3.pdf.json";
 

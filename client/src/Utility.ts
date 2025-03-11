@@ -2,7 +2,6 @@ import {
   Bounds,
   CitationRegionsPerPage,
   DocIntResponse,
-  findWordByOffset,
   Line,
   Polygon4,
   PolygonC,
@@ -10,8 +9,7 @@ import {
   excerptToSummary,
   flattenPolygon4,
   combinePolygons,
-  SearchResultSegment,
-  Range,
+  Range
 } from "./di";
 interface Column {
   polygon: number[];
@@ -548,122 +546,3 @@ export function findUserSelection(
 
   return { excerpt, bounds };
 }
-
-/**
- * Searches for exact match instances of a given input string in the document's full content
- *  
- * @param input - The input string to search for in the document.
- * @param di - The document interpretation response containing the analyzed text.
- * @returns An array of search results, each containing the text, page number,
- *          bounding regions, and matching ratio. Mathing ratio is 1 because of exact matches.
-
- */
-export function exactMatchSearch(
-  input: string,
-  di: DocIntResponse,
-){
-  const SearchResults = []
-  const fullText = di.analyzeResult?.content;
-  if (!fullText) {
-    console.log("exactMatchSearch: No content in document");
-    return [];
-  }
-  if (input.length === 0) {
-    console.log("exactMatchSearch: Empty input");
-    return [];
-  }
-
-  let index = 0;
-  while (index < fullText.length) {
-  // Locate the text input in the full text
-    const offset = fullText.indexOf(input, index);
-    if (offset === -1) {
-      // If the input text is not in the document 
-      if (index === 0) {
-        console.log("exactMatchSearch: Input text not found");
-        return [];
-      }
-      return SearchResults;
-    }
-    index = offset + input.length;
-
-    // Map start and end positions to word indices
-    const startOffset = offset;
-    const endOffset = offset + input.length - 1;
-
-
-    const startLoc = findWordByOffset(startOffset, di);
-    if (!startLoc) {
-      console.log("offsetBasedExcerpt | could not map start offset to word");
-      return [];
-    }
-    const endLoc = findWordByOffset(endOffset, di);
-    if (!endLoc) {
-      console.log("offsetBasedExcerpt | could not map end offset to word");
-      return [];
-    }
-    const [startPage, startWord] = startLoc;
-    const [endPage, endWord] = endLoc;
-    const segments = createSearchResult([startPage, endPage],[startWord, endWord],di)
-    SearchResults.push({segments,matchingRatio: 1});
-  }
-  return SearchResults;
-  }
-
-/**
- * Creates search result segment from a specified range of words across one or more pages.
- *
- * @param range - A tuple representing the start and end pages (0-indexed).
- * @param wordRange - A tuple representing the start and end word indices.
- * @param di - The document interpretation response containing the text analysis.
- * @returns Array of SearchResultSegment containing the input text, page number and
- *          corresponding bounding regions.
- */
-function createSearchResult(
-  [startPage, endPage]: Range,
-  [startWord, endWord]: Range,
-  di: DocIntResponse
-): SearchResultSegment[] {
-  const segments: SearchResultSegment[] = [];
-
-  for (let pageIndex = startPage; pageIndex <= endPage; pageIndex++) {
-    const segment = { text: "", page: -1, boundingRegions: {} as PolygonC} as SearchResultSegment;
-    const page = di.analyzeResult.pages[pageIndex];
-
-    if (!page.regions) continue;
-
-    for (const region of page.regions) {
-      // if the end of this region is still prior to our startWord (and we're
-      // on startWord's page), skip it
-      if (pageIndex == startPage && region.wordIndices[1] < startWord) continue;
-      // if the beginning of this region is past our endWord (and we're on
-      // endWord's page), break the loop
-      if (pageIndex == endPage && region.wordIndices[0] > endWord) break;
-
-      // grab the relevant start and end points in the Word array
-      const start =
-        pageIndex == startPage
-          ? Math.max(startWord, region.wordIndices[0])
-          : region.wordIndices[0];
-      const end =
-        pageIndex == endPage
-          ? Math.min(endWord, region.wordIndices[1])
-          : region.wordIndices[1];
-      const words = page.words.slice(start, end + 1);
-
-      // get text from this region
-      const contents = words.map((word) => word.content);
-      if (segment.text.length > 0 && contents.length > 0)
-        segment.text += " ";
-      segment.text += contents.join(" ");
-
-      // get polygon(s) from this region
-      const polygons = words.map((word) => word.polygon);
-      const poly = combinePolygons(polygons as Polygon4[]);
-      segment.page = pageIndex + 1;
-      segment.boundingRegions = poly;
-      segments.push(segment);
-    }
-  }
-  return segments;
-};
