@@ -336,12 +336,12 @@ const exactMatchSearchTest = (
   });
 
   const input0 = "sadjfksajdh"
-  const expected0 = []
+  // expected should be a empty array
   exactMatchSearchTest(
    "the input should not be found in the document",
     input0,
     di0,
-    expected0 
+    []
   );
 
   const input1 = "Microsoft Cloud Strength Fuels Third Quarter Results"
@@ -360,7 +360,7 @@ const exactMatchSearchTest = (
     "should find one exact match in the document",
     input1,
     di0,
-    expected1
+    expected1 as []
   );
 
 const input2 = "Revenue in"
@@ -412,5 +412,5 @@ exactMatchSearchTest(
   "should multi exact matches in the document",
   input2,
   di0,
-  expected2
+  expected2 as []
 );

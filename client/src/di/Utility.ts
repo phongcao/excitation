@@ -331,7 +331,7 @@ export function flattenPolygon4(polygon?: Polygon4): number[] {
  * @param input - The input string to search for in the document.
  * @param di - The document interpretation response containing the analyzed text.
  * @returns An array of search results, each containing the text, page number,
- *          bounding regions, and matching ratio. Mathing ratio is 1 because of exact matches.
+ *          bounding regions, and matching ratio. Matching ratio is 1 because of exact matches.
 
  */
 export function exactMatchSearch(

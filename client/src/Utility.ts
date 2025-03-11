@@ -8,8 +8,7 @@ import {
   Word,
   excerptToSummary,
   flattenPolygon4,
-  combinePolygons,
-  Range
+  combinePolygons
 } from "./di";
 
 interface Column {
