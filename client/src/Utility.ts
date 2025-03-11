@@ -12,8 +12,8 @@ import {
   combinePolygons,
 } from "./di";
 import { 
+  PolygonOnPage,
   Range,
-  Region,
 } from "./di/Types";
 
 interface Column {
@@ -629,7 +629,7 @@ function createSearchResult(
   [startWord, endWord]: Range,
   di: DocIntResponse
 ){
-  const segments = { text: "", pageNumber: -1, boundingRedions: [] as Region[] };
+  const segments = { text: "", pageNumber: -1, boundingRegions: [] as PolygonOnPage[]};
 
   for (let pageIndex = startPage; pageIndex <= endPage; pageIndex++) {
     const page = di.analyzeResult.pages[pageIndex];
@@ -664,13 +664,10 @@ function createSearchResult(
       // get polygon(s) from this region
       const polygons = words.map((word) => word.polygon);
       const poly = combinePolygons(polygons as Polygon4[]);
-      console.log("poly", poly);
       segments.pageNumber = pageIndex + 1;
-      segments.boundingRedions.push({
-        polygon: region.polygon,
-        lineIndices: region.lineIndices,
-        wordIndices: region.wordIndices,
-        paragraphIndex: region.paragraphIndex,
+      segments.boundingRegions.push({
+        polygon: poly,
+        page: pageIndex + 1
       });
   }
 }
