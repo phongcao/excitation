@@ -19,7 +19,7 @@ import {
   FormStatus,
   LoadedState,
 } from "./Types";
-import { createCitationId, exactMatchSearch, returnTextPolygonsFromDI } from "./Utility";
+import { createCitationId, returnTextPolygonsFromDI } from "./Utility";
 import { createPerPageRegions, summaryToBounds, rangeToSummary } from "./di";
 import { BlobClient } from "@azure/storage-blob";
 
